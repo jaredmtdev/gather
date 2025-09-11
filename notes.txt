@@ -1,0 +1,46 @@
+possible names for this library:
+ants
+together
+
+this will be a library for building out pipelines
+
+many other libraries were either only able to solve a specific usecase or they became too complicated
+
+For fun and learning, I will attempt to build a library that covers most cases, is very extensible, and very easy/intuitive to use
+
+I don't expect to accomplish it (everyone in the past has failed so far) but it will be fun to try!
+
+everything you need will be in one package for convenience
+
+pipeline contains:
+-a generator (or should it just be a channel? and user fully defines generator)
+--out chan
+-stage(s)
+--in/out chan. but user only builds the map function (user defines how to process each input)?
+--opts for each stage
+--middleware passed into workers
+-ctx for pipeline
+
+stage options:
+-workerSize (number of workers)
+-bufferSize (size of channel)
+-shardSize (number of channels)
+
+middleware:
+-circuitbreaker
+-retry
+
+helpers?
+-merge
+
+
+challenges/thoughts on above:
+-what if there are 2 pipelines and they need to merge on some middlestage?
+--probably should get the output channels of both and then start a third pipeline which ingests both channels
+--or... we could just build stages (no actual pipeline orchestration)
+-we need to be able to test each stage independently.
+-what if based on the result, there may be several different stages you want to send to?
+--get the result chan and start new pipelines?
+-do we want to handle splitting/merging?? (probably better off not doing that for now)
+-can offer some built-in generators (i.e. merger can return a generator)
+-how would we handle split??
