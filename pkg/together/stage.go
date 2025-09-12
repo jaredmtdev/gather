@@ -68,16 +68,13 @@ func (s *Scope[IN]) Go(f func()) {
 	s.wgJob.Go(f)
 }
 
+// Handler - function used to handle a single request sent to the worker
 // error handling done here. user can:
 //   - cancel the context if needed for immediate shutdown
 //   - for graceful shutdown: user controls generator. can just close in chan and then let all downstream stages finish
 //   - send to their own err channel (which could be processed by another Workers)
 //   - use workerHandler for retries, ReplyTo pattern, etc
 type Handler[IN any, OUT any] func(ctx context.Context, in IN, scope *Scope[IN]) (OUT, error)
-
-func (h Handler[IN, OUT]) Work(ctx context.Context, in IN, scope *Scope[IN]) (OUT, error) {
-	return h(ctx, in, scope)
-}
 
 // workerStation - configures behavior of Workers
 type workerStation struct {
@@ -105,6 +102,7 @@ func newWorkerStation() *workerStation {
 	}
 }
 
+// Workers - build concurrency model based on the handler and options
 // error handling is done within work func. in there the user can:
 func Workers[IN any, OUT any](ctx context.Context, in <-chan IN, handler Handler[IN, OUT], opts ...Opt) <-chan OUT {
 	ws := newWorkerStation()
@@ -117,11 +115,11 @@ func Workers[IN any, OUT any](ctx context.Context, in <-chan IN, handler Handler
 	// using internal queue to allow retries to send back to queue
 	// since we don't control closing of in chan
 	queue := make(chan IN, ws.bufferSize)
-	wgQueue := sync.WaitGroup{}
-	wgQueue.Add(1)
+	wgPump := sync.WaitGroup{}
+	wgPump.Add(1)
 	wgJob := sync.WaitGroup{}
 	go func() {
-		defer wgQueue.Done()
+		defer wgPump.Done()
 		for v := range in {
 			wgJob.Add(1)
 			select {
@@ -134,7 +132,7 @@ func Workers[IN any, OUT any](ctx context.Context, in <-chan IN, handler Handler
 	}()
 
 	go func() {
-		wgQueue.Wait()
+		wgPump.Wait()
 		wgJob.Wait()
 		close(queue)
 	}()
@@ -161,7 +159,7 @@ func Workers[IN any, OUT any](ctx context.Context, in <-chan IN, handler Handler
 				select {
 				case <-ctx.Done():
 					wgJob.Done()
-					// collect any remaining jobs to zero out the wait group
+					// collect any remaining jobs in queue to zero out the wait group
 					continue
 				default:
 				}
