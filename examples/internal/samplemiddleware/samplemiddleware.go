@@ -12,6 +12,7 @@ import (
 simplified versions of middlewares you can build to work with this library
 */
 
+// RetryAfter - retries inifinite times until success or context cancellation
 func RetryAfter[IN, OUT any](d time.Duration) together.Middleware[IN, OUT] {
 	return func(next together.Handler[IN, OUT]) together.Handler[IN, OUT] {
 		return together.Handler[IN, OUT](func(
@@ -26,6 +27,7 @@ func RetryAfter[IN, OUT any](d time.Duration) together.Middleware[IN, OUT] {
 	}
 }
 
+// Logger - prints input/ouput/error data
 func Logger[IN any, OUT any](infoPrefix, errorPrefix string) together.Middleware[IN, OUT] {
 	return func(next together.Handler[IN, OUT]) together.Handler[IN, OUT] {
 		return together.Handler[IN, OUT](func(ctx context.Context, in IN, s *together.Scope[IN]) (OUT, error) {
@@ -40,6 +42,7 @@ func Logger[IN any, OUT any](infoPrefix, errorPrefix string) together.Middleware
 	}
 }
 
+// Timeout - add timeout on each request
 func Timeout[IN any, OUT any](duration time.Duration) together.Middleware[IN, OUT] {
 	return func(next together.Handler[IN, OUT]) together.Handler[IN, OUT] {
 		return together.Handler[IN, OUT](func(ctx context.Context, in IN, s *together.Scope[IN]) (OUT, error) {
@@ -55,6 +58,7 @@ type counter[IN, OUT any] struct {
 	count atomic.Uint64
 }
 
+// Counter - stateful middleware that keeps track of how many requests are being made
 func Counter[IN, OUT any](every int) together.Middleware[IN, OUT] {
 	if every <= 0 {
 		every = 1
