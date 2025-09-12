@@ -30,42 +30,46 @@ what if user wants retries? (probably want to track number of retries for each d
 
 the middleware approach does in fact seem like it can help for just about any use case
 
-time out option on each stage???
--no: this can be done via middleware
+
+***what if we want to do something after worker shuts down? (like w.Close())
+***what if we want to execute something periodically? (like w.Flush())
 
 */
 
-// this handler is to give the user the ability to do things that require internal mechanisms
+// Scope - gives the user some ability to do things that require internal mechanisms
 type Scope[IN any] struct {
-	enqueue func(v IN)
-	wg      *sync.WaitGroup
-	once    *sync.Once
+	enqueue   func(v IN)
+	willRetry bool
+	once      *sync.Once
+	wgJob     *sync.WaitGroup
 }
 
-func (s *Scope[IN]) RetryAfter(in IN, after time.Duration) {
+func (s *Scope[IN]) RetryAfter(ctx context.Context, in IN, after time.Duration) {
 	s.once.Do(func() {
-		s.wg.Add(1)
-		time.AfterFunc(after, func() {
-			defer s.wg.Done()
-			s.enqueue(in)
+		s.willRetry = true
+		s.wgJob.Go(func() {
+			select {
+			case <-ctx.Done():
+			case <-time.After(after):
+				s.enqueue(in)
+			}
 		})
 	})
 }
 
-func (s *Scope[IN]) Retry(in IN) {
-	s.RetryAfter(in, 0)
+func (s *Scope[IN]) Retry(ctx context.Context, in IN) {
+	s.RetryAfter(ctx, in, 0)
 }
 
-// allow your work to safely spin up a new go routine
-// note that the "work" is executed in a worker which is already running on it's own go routine
+// allow your work to safely spin up a new go routine (in addition to the worker go routine)
 //
 // this might be useful for patterns like ReplyTo
 func (s *Scope[IN]) Go(f func()) {
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
-		f()
-	}()
+	s.wgJob.Go(f)
+}
+
+type Handler[IN any, OUT any] interface {
+	Work(ctx context.Context, in IN, scope *Scope[IN]) (OUT, error)
 }
 
 // error handling done here. user can:
@@ -73,7 +77,11 @@ func (s *Scope[IN]) Go(f func()) {
 //   - for graceful shutdown: user controls generator. can just close in chan and then let all downstream stages finish
 //   - send to their own err channel (which could be processed by another Workers)
 //   - use workerHandler for retries, ReplyTo pattern, etc
-type Handler[IN any, OUT any] func(ctx context.Context, in IN, scope *Scope[IN]) (OUT, error)
+type HandlerFunc[IN any, OUT any] func(ctx context.Context, in IN, scope *Scope[IN]) (OUT, error)
+
+func (h HandlerFunc[IN, OUT]) Work(ctx context.Context, in IN, scope *Scope[IN]) (OUT, error) {
+	return h(ctx, in, scope)
+}
 
 // workerStation - configures behavior of Workers
 type workerStation struct {
@@ -95,12 +103,6 @@ func WithBufferSize(bufferSize int) Opt {
 	}
 }
 
-// func WithMiddleware[IN any, OUT any](middleware Middleware[IN, OUT]) Opt {
-// 	return func(w *workerStation[IN, OUT]) {
-// 		w.middleware = middleware
-// 	}
-// }
-
 func newWorkerStation() *workerStation {
 	return &workerStation{
 		workerSize: 1,
@@ -116,19 +118,29 @@ func Workers[IN any, OUT any](ctx context.Context, in <-chan IN, handler Handler
 
 	out := make(chan OUT, ws.bufferSize)
 
-	// using internal queue to allow retries
+	// using internal queue to allow retries to send back to queue
+	// since we don't control closing of in chan
 	queue := make(chan IN, ws.bufferSize)
 	wgQueue := sync.WaitGroup{}
 	wgQueue.Add(1)
+	wgJob := sync.WaitGroup{}
 	go func() {
 		defer wgQueue.Done()
 		for v := range in {
+			wgJob.Add(1)
 			select {
 			case <-ctx.Done():
+				wgJob.Done()
 				return
 			case queue <- v:
 			}
 		}
+	}()
+
+	go func() {
+		wgQueue.Wait()
+		wgJob.Wait()
+		close(queue)
 	}()
 
 	enqueue := func(v IN) {
@@ -138,11 +150,11 @@ func Workers[IN any, OUT any](ctx context.Context, in <-chan IN, handler Handler
 		}
 	}
 
-	wg := sync.WaitGroup{}
-	wg.Add(ws.workerSize)
+	wgWorker := sync.WaitGroup{}
+	wgWorker.Add(ws.workerSize)
 	for range ws.workerSize {
 		go func() {
-			defer wg.Done()
+			defer wgWorker.Done()
 			select {
 			case <-ctx.Done():
 				return
@@ -152,10 +164,14 @@ func Workers[IN any, OUT any](ctx context.Context, in <-chan IN, handler Handler
 			for v := range queue {
 				scope := Scope[IN]{
 					enqueue: enqueue,
-					wg:      &wgQueue,
+					wgJob:   &wgJob,
 					once:    &sync.Once{},
 				}
-				res, err := handler(ctx, v, &scope)
+
+				res, err := handler.Work(ctx, v, &scope)
+				if !scope.willRetry {
+					wgJob.Done()
+				}
 				if err == nil {
 					select {
 					case <-ctx.Done():
@@ -167,9 +183,7 @@ func Workers[IN any, OUT any](ctx context.Context, in <-chan IN, handler Handler
 		}()
 	}
 	go func() {
-		wgQueue.Wait()
-		close(queue)
-		wg.Wait()
+		wgWorker.Wait()
 		close(out)
 	}()
 	return out
