@@ -27,8 +27,9 @@ func main() {
 		samplemiddleware.Counter[int, int](15),
 		samplemiddleware.RetryAfter[int, int](100*time.Millisecond),
 	)
-
-	add := func(num int) together.HandlerFunc[int, int] {
+	ctxParent, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	add := func(num int) together.Handler[int, int] {
 		return func(ctx context.Context, in int, scope *together.Scope[int]) (int, error) {
 			time.Sleep(time.Duration(rand.Int63n(200)) * time.Millisecond)
 			select {
@@ -50,6 +51,9 @@ func main() {
 				case <-time.After(100 * time.Millisecond):
 				}
 			}
+			if in == 10 {
+				cancel()
+			}
 			if in == 7 {
 				scope.Go(func() {
 					time.Sleep(2 * time.Second)
@@ -65,7 +69,7 @@ func main() {
 		together.WithBufferSize(0),
 	}
 
-	for range together.Workers(context.Background(), gen(40), mw(add(3)), opts...) {
+	for range together.Workers(ctxParent, gen(40), mw(add(3)), opts...) {
 	}
 
 }

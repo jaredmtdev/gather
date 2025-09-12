@@ -9,6 +9,7 @@ import (
 /*
 the goal is to offload as much of the complexities as possible to middleware
 keep Workers as simple/intuitive as possible
+This way the worker can focus more on business logic
 
 keep everything in one package for now. 3 main components:
 -Workers
@@ -17,7 +18,7 @@ keep everything in one package for now. 3 main components:
 
 
 what if the user wants an error channel + return type? what if they want a single return type that includes both?
--return type is always provided. for error channel: user controls all generators. they can use "work" func to send err to errCh
+-return type is always provided. for separate error channel: user controls all generators. they can use their "work" func to send err to errCh
 
 what if user wants to stop on first error like errgroup?
 they can cancel context on first error and handle error which ever way they want (send to err channel or handle right here)
@@ -27,8 +28,6 @@ user can send errors to err channel. a separate worker can consume them
 
 what if user wants retries? (probably want to track number of retries for each data)
 -use WorkHandler for this (used within "work")
-
-the middleware approach does in fact seem like it can help for just about any use case
 
 
 ***what if we want to do something after worker shuts down? (like w.Close())
@@ -50,6 +49,7 @@ func (s *Scope[IN]) RetryAfter(ctx context.Context, in IN, after time.Duration) 
 		s.wgJob.Go(func() {
 			select {
 			case <-ctx.Done():
+				s.wgJob.Done()
 			case <-time.After(after):
 				s.enqueue(in)
 			}
@@ -68,18 +68,14 @@ func (s *Scope[IN]) Go(f func()) {
 	s.wgJob.Go(f)
 }
 
-type Handler[IN any, OUT any] interface {
-	Work(ctx context.Context, in IN, scope *Scope[IN]) (OUT, error)
-}
-
 // error handling done here. user can:
 //   - cancel the context if needed for immediate shutdown
 //   - for graceful shutdown: user controls generator. can just close in chan and then let all downstream stages finish
 //   - send to their own err channel (which could be processed by another Workers)
 //   - use workerHandler for retries, ReplyTo pattern, etc
-type HandlerFunc[IN any, OUT any] func(ctx context.Context, in IN, scope *Scope[IN]) (OUT, error)
+type Handler[IN any, OUT any] func(ctx context.Context, in IN, scope *Scope[IN]) (OUT, error)
 
-func (h HandlerFunc[IN, OUT]) Work(ctx context.Context, in IN, scope *Scope[IN]) (OUT, error) {
+func (h Handler[IN, OUT]) Work(ctx context.Context, in IN, scope *Scope[IN]) (OUT, error) {
 	return h(ctx, in, scope)
 }
 
@@ -162,13 +158,20 @@ func Workers[IN any, OUT any](ctx context.Context, in <-chan IN, handler Handler
 			}
 
 			for v := range queue {
+				select {
+				case <-ctx.Done():
+					wgJob.Done()
+					// collect any remaining jobs to zero out the wait group
+					continue
+				default:
+				}
 				scope := Scope[IN]{
 					enqueue: enqueue,
 					wgJob:   &wgJob,
 					once:    &sync.Once{},
 				}
 
-				res, err := handler.Work(ctx, v, &scope)
+				res, err := handler(ctx, v, &scope)
 				if !scope.willRetry {
 					wgJob.Done()
 				}

@@ -14,7 +14,7 @@ simplified versions of middlewares you can build to work with this library
 
 func RetryAfter[IN, OUT any](d time.Duration) together.Middleware[IN, OUT] {
 	return func(next together.Handler[IN, OUT]) together.Handler[IN, OUT] {
-		return together.HandlerFunc[IN, OUT](func(
+		return together.Handler[IN, OUT](func(
 			ctx context.Context, in IN, s *together.Scope[IN],
 		) (OUT, error) {
 			out, err := next.Work(ctx, in, s)
@@ -28,7 +28,7 @@ func RetryAfter[IN, OUT any](d time.Duration) together.Middleware[IN, OUT] {
 
 func Logger[IN any, OUT any](infoPrefix, errorPrefix string) together.Middleware[IN, OUT] {
 	return func(next together.Handler[IN, OUT]) together.Handler[IN, OUT] {
-		return together.HandlerFunc[IN, OUT](func(ctx context.Context, in IN, s *together.Scope[IN]) (OUT, error) {
+		return together.Handler[IN, OUT](func(ctx context.Context, in IN, s *together.Scope[IN]) (OUT, error) {
 			out, err := next.Work(ctx, in, s)
 			if err != nil {
 				fmt.Println(errorPrefix, in, err)
@@ -42,7 +42,7 @@ func Logger[IN any, OUT any](infoPrefix, errorPrefix string) together.Middleware
 
 func Timeout[IN any, OUT any](duration time.Duration) together.Middleware[IN, OUT] {
 	return func(next together.Handler[IN, OUT]) together.Handler[IN, OUT] {
-		return together.HandlerFunc[IN, OUT](func(ctx context.Context, in IN, s *together.Scope[IN]) (OUT, error) {
+		return together.Handler[IN, OUT](func(ctx context.Context, in IN, s *together.Scope[IN]) (OUT, error) {
 			c, cancel := context.WithTimeout(ctx, duration)
 			defer cancel()
 			return next.Work(c, in, s)
@@ -63,7 +63,7 @@ func Counter[IN, OUT any](every int) together.Middleware[IN, OUT] {
 		every: uint64(every),
 	}
 	return func(next together.Handler[IN, OUT]) together.Handler[IN, OUT] {
-		return together.HandlerFunc[IN, OUT](func(
+		return together.Handler[IN, OUT](func(
 			ctx context.Context, in IN, s *together.Scope[IN],
 		) (OUT, error) {
 			out, err := next.Work(ctx, in, s)
