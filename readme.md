@@ -9,9 +9,11 @@ A lightweight concurrency library built for simplicity and control.
 - pipelines
 - middleware
 
+## Example usage
+
 ## How it is simple
 
-Following go's philosphy, I don't want this library to become bloated with features that are not needed.
+Following go's philosphy, this library aims to avoid being bloated with features that are not needed.
 This library is simple because it:
 
 - enables developers to build just about any concurrency model

@@ -2,3 +2,4 @@ TODO:
 
 -setup unit tests and benchmarks
 -can we provide any mechanism for easy sharding?
+-how to handle maintaining order of results even if processing out of order?
