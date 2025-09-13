@@ -19,7 +19,7 @@ func main() {
 	)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	addHandler := func(num int) together.Handler[int, int] {
+	addHandler := func(num int) together.HandlerFunc[int, int] {
 		return func(ctx context.Context, in int, scope *together.Scope[int]) (int, error) {
 			select {
 			case <-time.After(time.Duration(rand.Intn(200)) * time.Millisecond):

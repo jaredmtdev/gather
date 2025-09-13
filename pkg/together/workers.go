@@ -4,49 +4,15 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 )
 
-// Scope - gives the user some ability to do things that require internal mechanisms
-type Scope[IN any] struct {
-	enqueue   func(v IN)
-	willRetry bool
-	once      *sync.Once
-	wgJob     *sync.WaitGroup
-}
-
-func (s *Scope[IN]) RetryAfter(ctx context.Context, in IN, after time.Duration) {
-	s.once.Do(func() {
-		s.willRetry = true
-		s.wgJob.Go(func() {
-			select {
-			case <-ctx.Done():
-				s.wgJob.Done()
-			case <-time.After(after):
-				s.enqueue(in)
-			}
-		})
-	})
-}
-
-// Retry - will retry immediately
-func (s *Scope[IN]) Retry(ctx context.Context, in IN) {
-	s.RetryAfter(ctx, in, 0)
-}
-
-// allow your work to safely spin up a new go routine (in addition to the worker go routine)
-// the worker will stay alive until this go routine completes
-func (s *Scope[IN]) Go(f func()) {
-	s.wgJob.Go(f)
-}
-
-// Handler - function used to handle a single request sent to the worker
+// HandlerFunc - function used to handle a single request sent to the worker
 // error handling done here. user can:
 //   - cancel the context if needed for immediate shutdown
 //   - for graceful shutdown: user controls generator. can just close in chan and then let all downstream stages finish
 //   - send to their own err channel (which could be processed by another Workers)
 //   - use workerHandler for retries, ReplyTo pattern, etc
-type Handler[IN any, OUT any] func(ctx context.Context, in IN, scope *Scope[IN]) (OUT, error)
+type HandlerFunc[IN any, OUT any] func(ctx context.Context, in IN, scope *Scope[IN]) (OUT, error)
 
 // workerStation - configures behavior of Workers
 type workerStation struct {
@@ -74,19 +40,20 @@ func WithBufferSize(bufferSize int) Opt {
 	}
 }
 
-func newWorkerStation() *workerStation {
-	return &workerStation{
+func newWorkerStation(opts []Opt) *workerStation {
+	ws := &workerStation{
 		workerSize: 1,
 	}
+	for _, opt := range opts {
+		opt(ws)
+	}
+	return ws
 }
 
 // Workers - build a single pipeline stage based on the handler and options
 // error handling is done within work func. in there the user can:
-func Workers[IN any, OUT any](ctx context.Context, in <-chan IN, handler Handler[IN, OUT], opts ...Opt) <-chan OUT {
-	ws := newWorkerStation()
-	for _, opt := range opts {
-		opt(ws)
-	}
+func Workers[IN any, OUT any](ctx context.Context, in <-chan IN, handler HandlerFunc[IN, OUT], opts ...Opt) <-chan OUT {
+	ws := newWorkerStation(opts)
 
 	out := make(chan OUT, ws.bufferSize)
 
@@ -137,7 +104,7 @@ func Workers[IN any, OUT any](ctx context.Context, in <-chan IN, handler Handler
 				select {
 				case <-ctx.Done():
 					wgJob.Done()
-					// collect any remaining jobs in queue to zero out the wait group
+					// drain any remaining jobs in queue to zero out the wait group
 					continue
 				default:
 				}

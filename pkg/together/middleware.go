@@ -1,11 +1,11 @@
 package together
 
 // Middleware - wraps handlers
-type Middleware[IN any, OUT any] func(Handler[IN, OUT]) Handler[IN, OUT]
+type Middleware[IN any, OUT any] func(HandlerFunc[IN, OUT]) HandlerFunc[IN, OUT]
 
 // Chain middleware together in FIFO execution order
 func Chain[IN any, OUT any](mws ...Middleware[IN, OUT]) Middleware[IN, OUT] {
-	return func(h Handler[IN, OUT]) Handler[IN, OUT] {
+	return func(h HandlerFunc[IN, OUT]) HandlerFunc[IN, OUT] {
 		for _, mw := range mws {
 			h = mw(h)
 		}
