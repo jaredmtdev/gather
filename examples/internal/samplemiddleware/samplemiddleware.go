@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync/atomic"
 	"time"
-	"together/pkg/together"
+	"together"
 )
 
 /*

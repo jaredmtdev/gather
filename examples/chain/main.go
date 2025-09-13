@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"math/rand"
 	"time"
+	"together"
 	"together/examples/internal/samplegen"
 	"together/examples/internal/samplemiddleware"
-	"together/pkg/together"
 )
 
 func main() {
