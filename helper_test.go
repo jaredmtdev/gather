@@ -5,7 +5,7 @@ import (
 	"math/rand"
 	"sync/atomic"
 	"time"
-	"together/pkg/together"
+	"together"
 )
 
 type number interface {

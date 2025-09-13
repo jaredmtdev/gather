@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"testing"
-	"together/pkg/together"
+	"together"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
