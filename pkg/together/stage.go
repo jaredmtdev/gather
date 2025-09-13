@@ -2,6 +2,7 @@ package together
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -56,12 +57,18 @@ type workerStation struct {
 type Opt func(w *workerStation)
 
 func WithWorkerSize(workerSize int) Opt {
+	if workerSize <= 0 {
+		panic(fmt.Sprintf("must use at least 1 worker! workerSize: %v", workerSize))
+	}
 	return func(w *workerStation) {
 		w.workerSize = workerSize
 	}
 }
 
 func WithBufferSize(bufferSize int) Opt {
+	if bufferSize < 0 {
+		panic(fmt.Sprintf("buffer must be at least 0! bufferSize: %v", bufferSize))
+	}
 	return func(w *workerStation) {
 		w.bufferSize = bufferSize
 	}
@@ -84,7 +91,7 @@ func Workers[IN any, OUT any](ctx context.Context, in <-chan IN, handler Handler
 	out := make(chan OUT, ws.bufferSize)
 
 	// using internal queue to allow retries to send back to queue
-	// since we don't control closing of in chan
+	// since this block doesn't control closing of the in chan
 	queue := make(chan IN, ws.bufferSize)
 	wgPump := sync.WaitGroup{}
 	wgPump.Add(1)

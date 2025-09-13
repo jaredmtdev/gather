@@ -1,5 +1,6 @@
 package together
 
+// Middleware - wraps handlers
 type Middleware[IN any, OUT any] func(Handler[IN, OUT]) Handler[IN, OUT]
 
 // Chain middleware together in FIFO execution order
