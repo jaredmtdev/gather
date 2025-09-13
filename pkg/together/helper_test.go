@@ -27,28 +27,28 @@ func gen[T number](n T) <-chan T {
 }
 
 // === handlers ===
-func convert[FROM number, TO number]() together.Handler[FROM, TO] {
+func convert[FROM number, TO number]() together.HandlerFunc[FROM, TO] {
 	return func(ctx context.Context, in FROM, scope *together.Scope[FROM]) (TO, error) {
 		return TO(in), nil
 	}
 }
 
-func add[T number](num T) together.Handler[T, T] {
+func add[T number](num T) together.HandlerFunc[T, T] {
 	return func(ctx context.Context, in T, scope *together.Scope[T]) (T, error) {
 		return in + num, nil
 	}
 }
-func subtract[T number](num T) together.Handler[T, T] {
+func subtract[T number](num T) together.HandlerFunc[T, T] {
 	return func(ctx context.Context, in T, scope *together.Scope[T]) (T, error) {
 		return in - num, nil
 	}
 }
-func multiply[T number](num T) together.Handler[T, T] {
+func multiply[T number](num T) together.HandlerFunc[T, T] {
 	return func(ctx context.Context, in T, scope *together.Scope[T]) (T, error) {
 		return in * num, nil
 	}
 }
-func divide[T number](num T) together.Handler[T, T] {
+func divide[T number](num T) together.HandlerFunc[T, T] {
 	return func(ctx context.Context, in T, scope *together.Scope[T]) (T, error) {
 		return in / num, nil
 	}
@@ -57,7 +57,7 @@ func divide[T number](num T) together.Handler[T, T] {
 // === middleware ===
 
 func mwDelay[IN, OUT any](d time.Duration) together.Middleware[IN, OUT] {
-	return func(next together.Handler[IN, OUT]) together.Handler[IN, OUT] {
+	return func(next together.HandlerFunc[IN, OUT]) together.HandlerFunc[IN, OUT] {
 		return func(ctx context.Context, in IN, scope *together.Scope[IN]) (OUT, error) {
 			select {
 			case <-ctx.Done():
@@ -72,7 +72,7 @@ func mwDelay[IN, OUT any](d time.Duration) together.Middleware[IN, OUT] {
 
 func mwRandomDelay[IN, OUT any](seed int64, minDuration time.Duration, maxDuration time.Duration) together.Middleware[IN, OUT] {
 	r := rand.New(rand.NewSource(seed))
-	return func(next together.Handler[IN, OUT]) together.Handler[IN, OUT] {
+	return func(next together.HandlerFunc[IN, OUT]) together.HandlerFunc[IN, OUT] {
 		return func(ctx context.Context, in IN, scope *together.Scope[IN]) (OUT, error) {
 			randInterval := time.Duration(r.Int63n(int64(maxDuration - minDuration)))
 			delayTime := minDuration + randInterval
@@ -88,7 +88,7 @@ func mwRandomDelay[IN, OUT any](seed int64, minDuration time.Duration, maxDurati
 }
 
 func mwCancelOnInput[IN comparable, OUT any](cancelOn IN, cancel context.CancelFunc) together.Middleware[IN, OUT] {
-	return func(next together.Handler[IN, OUT]) together.Handler[IN, OUT] {
+	return func(next together.HandlerFunc[IN, OUT]) together.HandlerFunc[IN, OUT] {
 		return func(ctx context.Context, in IN, scope *together.Scope[IN]) (OUT, error) {
 			if in == cancelOn {
 				cancel()
@@ -102,7 +102,7 @@ func mwCancelOnInput[IN comparable, OUT any](cancelOn IN, cancel context.CancelF
 
 func mwCancelOnCount[IN any, OUT any](cancelOn int32, cancel context.CancelFunc) together.Middleware[IN, OUT] {
 	count := atomic.Int32{}
-	return func(next together.Handler[IN, OUT]) together.Handler[IN, OUT] {
+	return func(next together.HandlerFunc[IN, OUT]) together.HandlerFunc[IN, OUT] {
 		return func(ctx context.Context, in IN, scope *together.Scope[IN]) (OUT, error) {
 			if count.Add(1) == cancelOn {
 				cancel()
