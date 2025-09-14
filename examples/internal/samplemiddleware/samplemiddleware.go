@@ -12,15 +12,24 @@ import (
 simplified versions of middlewares you can build to work with this library
 */
 
-// RetryAfter - retries inifinite times until success or context cancellation
-func RetryAfter[IN, OUT any](d time.Duration) together.Middleware[IN, OUT] {
+// RetryAfter - retries after given time delay
+// by default, will always retry unless shouldRetry is defined
+func RetryAfter[IN, OUT any](d time.Duration, shouldRetry ...func(i IN) (newIn IN, should bool)) together.Middleware[IN, OUT] {
+	if len(shouldRetry) == 0 {
+		shouldRetry = append(shouldRetry, func(i IN) (IN, bool) { return i, true })
+	}
 	return func(next together.HandlerFunc[IN, OUT]) together.HandlerFunc[IN, OUT] {
 		return together.HandlerFunc[IN, OUT](func(
 			ctx context.Context, in IN, s *together.Scope[IN],
 		) (OUT, error) {
 			out, err := next(ctx, in, s)
 			if err != nil {
-				s.RetryAfter(ctx, in, d)
+				in, should := shouldRetry[0](in)
+				if should {
+					s.RetryAfter(ctx, in, d)
+					return out, err
+				}
+				return out, fmt.Errorf("max retries hit for %+v. %w", in, err)
 			}
 			return out, err
 		})
