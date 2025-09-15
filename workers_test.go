@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"slices"
 	"testing"
-	"together"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"together"
 )
 
 func TestWorkersSynchronous(t *testing.T) {
