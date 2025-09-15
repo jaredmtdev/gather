@@ -1,7 +1,15 @@
 TODO:
 
--setup unit tests and benchmarks
+-setup benchmarks
 -can we provide any mechanism for easy sharding?
 -how to handle maintaining order of results even if processing out of order?
--set up makefile
--set up golangci-lint
+-test Scope
+-have simple examples + possible real-world examples
+-include WithErrChan()? this way middleware can wrap errors and get the full details sent
+--no: there's too many ways to design this and it would add complexity. instead: use middleware for shared err chan + wrapped errors
+-give an example that uses closures such that you have less input parameters - enabling you to chain workers
+
+
+examples ideas:
+-middlware: captures wrapped errors and sends to error channel that is used for all stages
+-use closures to chain stages together nicely

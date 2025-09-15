@@ -1,41 +1,39 @@
-
 # together
 
-A lightweight concurrency library built for simplicity and control.
+Together is a lightweight concurrency library for Go.
+It helps you build **worker pools, pipelines, and middleware**.
 
-## Enables you to build
+## Quick Example
 
-- worker pools
-- pipelines
-- middleware
+## Install
 
-## Example usage
+`go get github.com/???/together`
 
-## How it is simple
+## API at a glance
 
-Following go's philosphy, this library aims to avoid being bloated with features that are not needed.
-This library is simple because it:
+- Workers: function to start a worker pool
+- HandlerFunc: function to handle each request sent to worker pool
+- Scope: provided to HandlerFunc to enable Retries, safe go routines, etc
+- Middleware: helper to allow you to wrap middleware around the handler
+- Chain: helper to more cleanly chain middleware together
 
-- enables developers to build just about any concurrency model
-- provides a middleware mechanism
-  - very similar to known middleware patterns (like http package)
-  - decouples middleware from business logic - making it easier to read and debug
+## Design Philosophy
 
-## How it gives control
+Together provides the glue: the tools for workers, pipelines, and middleware.  
+You design the concurrency patterns that fit your use case.
 
-The goal of this library is to provide the glue that ties all your concurrency patterns together.
+Together is simple because it:
 
-By using this library, you are organizing your concurrency patterns into smaller more manageable parts.
+- enables developers to build almost any concurrency model
+- provides familiar middleware mechanisms (like "net/http")
+- decouples middleware logic from business logic for easier testing and debugging
 
-However, you are still responsible to build your middleware.
-It is up to YOU to determine how you want your retry logic to work.
-Why? Because there is no one-size-fits-all solution.
+Together is flexible because it:
 
-You are responsible for providing the input channel and for managing the output channel.
-Why? Because, there are infinite concurrency patterns.
-This library will not limit the use cases by favoring any particular pattern
+- leaves retry and error handling decisions to you
+- lets you manage input/ouput channels directly
+- avoids bias or enforcement of any particular pattern
 
-## In the works
+## Future Ideas
 
-in the future, this library may provide these features:
-- sharding: using multiple channels to help relieve some pressure where a buffer is not enough
+- sharding across multiple channels
