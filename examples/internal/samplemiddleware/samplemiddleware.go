@@ -9,7 +9,7 @@ import (
 )
 
 /*
-simplified versions of middlewares you can build to work with this library
+simple examples of middlewares that can be built to work with this library
 */
 
 // RetryAfter - retries after given time delay

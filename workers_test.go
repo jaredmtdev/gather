@@ -12,24 +12,24 @@ import (
 )
 
 func TestWorkersSynchronous(t *testing.T) {
-	i := 3
+	var i int
 	for v := range together.Workers(context.Background(), gen(20), add(3)) {
-		require.Equal(t, i, v)
+		require.Equal(t, i+3, v)
 		i++
 	}
-	assert.Equal(t, i, 23)
+	assert.Equal(t, 20, i)
 }
 
 func TestPipelineSynchronous(t *testing.T) {
 	ctx := context.Background()
 	out1 := together.Workers(ctx, gen(20), add(3))
 	out2 := together.Workers(ctx, out1, subtract(3))
-	i := 3
+	var i int
 	for v := range together.Workers(ctx, out2, add(3)) {
-		require.Equal(t, i, v)
+		require.Equal(t, i+3, v)
 		i++
 	}
-	assert.Equal(t, i, 23)
+	assert.Equal(t, 20, i)
 }
 
 func TestPipelineSynchronousWithMultipleTypes(t *testing.T) {
@@ -38,12 +38,12 @@ func TestPipelineSynchronousWithMultipleTypes(t *testing.T) {
 	out2 := together.Workers(ctx, out1, convert[int, float64]())
 	out3 := together.Workers(ctx, out2, subtract[float64](3))
 	out4 := together.Workers(ctx, out3, convert[float64, int]())
-	i := 3
+	var i int
 	for v := range together.Workers(context.Background(), out4, add(3)) {
-		require.Equal(t, i, v)
+		require.Equal(t, i+3, v)
 		i++
 	}
-	assert.Equal(t, i, 23)
+	assert.Equal(t, 20, i)
 }
 
 func TestPipelineSynchronousWithEarlyCancelAtLastStage(t *testing.T) {
@@ -56,10 +56,10 @@ func TestPipelineSynchronousWithEarlyCancelAtLastStage(t *testing.T) {
 
 	out1 := together.Workers(ctx, gen(20), add(3))
 	out2 := together.Workers(ctx, out1, subtract(3))
-	i := 2
+	var i int
 	for v := range together.Workers(ctx, out2, mw(add(3))) {
+		require.Equal(t, i+3, v)
 		i++
-		require.Equal(t, i, v)
 	}
 	assert.Less(t, i, 3+5)
 }
@@ -74,10 +74,10 @@ func TestPipelineSynchronousWithEarlyCancelAtFirstStage(t *testing.T) {
 
 	out1 := together.Workers(ctx, gen(20), mw(add(3)))
 	out2 := together.Workers(ctx, out1, subtract(3))
-	i := 2
+	var i int
 	for v := range together.Workers(ctx, out2, add(3)) {
+		require.Equal(t, i+3, v)
 		i++
-		require.Equal(t, i, v)
 	}
 	assert.Less(t, i, 3+5)
 }
@@ -163,6 +163,3 @@ func TestPipelineWithEarlyCancelAtFirstStage(t *testing.T) {
 	}
 	assert.Less(t, i, 5)
 }
-
-// TODO: add tests for scope (retries and safe go routine)
-// what happens if retry is attempted from inside Go?

@@ -35,7 +35,7 @@ func (s *Scope[IN]) Retry(ctx context.Context, in IN) {
 }
 
 // Go - allow your handler to safely spin up a new go routine (in addition to the worker go routine).
-// the worker will stay alive until this go routine completes
+// the worker will stay alive until this go routine completes.
 func (s *Scope[IN]) Go(f func()) {
 	s.wgJob.Go(f)
 }

@@ -1,0 +1,91 @@
+version: "2"
+
+formatters:
+  enable:
+    - gofmt 
+    - gci 
+
+linters:
+  enable:
+    - asasalint
+    - asciicheck 
+    - bidichk 
+    - bodyclose 
+    - canonicalheader 
+    - copyloopvar 
+    - cyclop 
+    - depguard 
+    - dupl 
+    - durationcheck 
+    - embeddedstructfieldcheck 
+    - err113
+    - errcheck 
+    - errname 
+    - errorlint 
+    - exhaustive 
+    - exptostd 
+    - fatcontext 
+    - forbidigo 
+    - funcorder 
+    - funlen 
+    - gocheckcompilerdirectives 
+    - gochecknoglobals 
+    - gochecknoinits 
+    - gochecksumtype 
+    - gocognit 
+    - goconst 
+    - gocritic 
+    - gocyclo 
+    - godot 
+    - gomoddirectives 
+    - goprintffuncname 
+    - gosec 
+    - govet 
+    - iface 
+    - ineffassign 
+    - intrange 
+    - loggercheck 
+    - makezero 
+    - mirror 
+    - misspell
+    - mnd 
+    - musttag 
+    - nakedret 
+    - nestif 
+    - nilerr 
+    - nilnesserr 
+    - nilnil 
+    - noctx 
+    - nolintlint 
+    - nonamedreturns 
+    - nosprintfhostport 
+    - perfsprint 
+    - predeclared 
+    - promlinter 
+    - protogetter 
+    - reassign 
+    - recvcheck 
+    - revive 
+    - rowserrcheck 
+    - spancheck 
+    - sqlclosecheck 
+    - staticcheck 
+    - testableexamples 
+    - testifylint 
+    - testpackage 
+    - tparallel 
+    - unconvert
+    - unparam
+    - usestdlibvars
+    - usetesting
+    - wastedassign
+    - whitespace
+
+  exclusions:
+    rules:
+    - path: _test.go$
+      linters: [gosec]
+      text: G404 
+
+  disable:
+    - unused # TODO: re-enable after tests/examples are finished

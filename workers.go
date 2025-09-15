@@ -14,14 +14,16 @@ import (
 //   - use workerHandler for retries, ReplyTo pattern, etc
 type HandlerFunc[IN any, OUT any] func(ctx context.Context, in IN, scope *Scope[IN]) (OUT, error)
 
-// workerStation - configures behavior of Workers
+// workerStation - configures behavior of Workers.
 type workerStation struct {
 	workerSize int
 	bufferSize int
 }
 
+// Opt - options used to configure Workers.
 type Opt func(w *workerStation)
 
+// WithWorkerSize - set number of concurrent workers.
 func WithWorkerSize(workerSize int) Opt {
 	if workerSize <= 0 {
 		panic(fmt.Sprintf("must use at least 1 worker! workerSize: %v", workerSize))
@@ -31,6 +33,7 @@ func WithWorkerSize(workerSize int) Opt {
 	}
 }
 
+// WithBufferSize - set buffer size for the internal and output channel.
 func WithBufferSize(bufferSize int) Opt {
 	if bufferSize < 0 {
 		panic(fmt.Sprintf("buffer must be at least 0! bufferSize: %v", bufferSize))
@@ -50,8 +53,7 @@ func newWorkerStation(opts []Opt) *workerStation {
 	return ws
 }
 
-// Workers - build a single pipeline stage based on the handler and options
-// error handling is done within work func. in there the user can:
+// Workers - build a single pipeline stage based on the handler and options.
 func Workers[IN any, OUT any](ctx context.Context, in <-chan IN, handler HandlerFunc[IN, OUT], opts ...Opt) <-chan OUT {
 	ws := newWorkerStation(opts)
 
