@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"sync"
+
+	"together/pkg/syncvalue"
 )
 
 // HandlerFunc - function used to handle a single request sent to the worker
@@ -111,9 +113,10 @@ func Workers[IN any, OUT any](ctx context.Context, in <-chan IN, handler Handler
 				default:
 				}
 				scope := Scope[IN]{
-					enqueue: enqueue,
-					wgJob:   &wgJob,
-					once:    &sync.Once{},
+					enqueue:     enqueue,
+					wgJob:       &wgJob,
+					once:        &sync.Once{},
+					retryClosed: &syncvalue.Value[bool]{},
 				}
 
 				res, err := handler(ctx, v, &scope)

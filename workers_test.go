@@ -12,24 +12,24 @@ import (
 )
 
 func TestWorkersSynchronous(t *testing.T) {
-	var i int
+	var got int
 	for v := range together.Workers(context.Background(), gen(20), add(3)) {
-		require.Equal(t, i+3, v)
-		i++
+		require.Equal(t, got+3, v)
+		got++
 	}
-	assert.Equal(t, 20, i)
+	assert.Equal(t, 20, got)
 }
 
 func TestPipelineSynchronous(t *testing.T) {
 	ctx := context.Background()
 	out1 := together.Workers(ctx, gen(20), add(3))
 	out2 := together.Workers(ctx, out1, subtract(3))
-	var i int
+	var got int
 	for v := range together.Workers(ctx, out2, add(3)) {
-		require.Equal(t, i+3, v)
-		i++
+		require.Equal(t, got+3, v)
+		got++
 	}
-	assert.Equal(t, 20, i)
+	assert.Equal(t, 20, got)
 }
 
 func TestPipelineSynchronousWithMultipleTypes(t *testing.T) {
@@ -38,12 +38,12 @@ func TestPipelineSynchronousWithMultipleTypes(t *testing.T) {
 	out2 := together.Workers(ctx, out1, convert[int, float64]())
 	out3 := together.Workers(ctx, out2, subtract[float64](3))
 	out4 := together.Workers(ctx, out3, convert[float64, int]())
-	var i int
+	var got int
 	for v := range together.Workers(context.Background(), out4, add(3)) {
-		require.Equal(t, i+3, v)
-		i++
+		require.Equal(t, got+3, v)
+		got++
 	}
-	assert.Equal(t, 20, i)
+	assert.Equal(t, 20, got)
 }
 
 func TestPipelineSynchronousWithEarlyCancelAtLastStage(t *testing.T) {
@@ -56,12 +56,12 @@ func TestPipelineSynchronousWithEarlyCancelAtLastStage(t *testing.T) {
 
 	out1 := together.Workers(ctx, gen(20), add(3))
 	out2 := together.Workers(ctx, out1, subtract(3))
-	var i int
+	var got int
 	for v := range together.Workers(ctx, out2, mw(add(3))) {
-		require.Equal(t, i+3, v)
-		i++
+		require.Equal(t, got+3, v)
+		got++
 	}
-	assert.Less(t, i, 3+5)
+	assert.Less(t, got, 3+5)
 }
 
 func TestPipelineSynchronousWithEarlyCancelAtFirstStage(t *testing.T) {
@@ -74,12 +74,12 @@ func TestPipelineSynchronousWithEarlyCancelAtFirstStage(t *testing.T) {
 
 	out1 := together.Workers(ctx, gen(20), mw(add(3)))
 	out2 := together.Workers(ctx, out1, subtract(3))
-	var i int
+	var got int
 	for v := range together.Workers(ctx, out2, add(3)) {
-		require.Equal(t, i+3, v)
-		i++
+		require.Equal(t, got+3, v)
+		got++
 	}
-	assert.Less(t, i, 3+5)
+	assert.Less(t, got, 3+5)
 }
 
 func TestMultipleWorkers(t *testing.T) {
@@ -123,11 +123,11 @@ func TestPipelineWithBackPressure(t *testing.T) {
 	ctx := context.Background()
 	out1 := together.Workers(ctx, gen(20), add(3), together.WithWorkerSize(5))
 	out2 := together.Workers(ctx, out1, subtract(3), together.WithWorkerSize(2))
-	var i int
+	var got int
 	for range together.Workers(ctx, out2, add(3)) {
-		i++
+		got++
 	}
-	assert.Equal(t, 20, i)
+	assert.Equal(t, 20, got)
 }
 
 func TestPipelineWithEarlyCancelAtLastStage(t *testing.T) {
@@ -140,11 +140,11 @@ func TestPipelineWithEarlyCancelAtLastStage(t *testing.T) {
 
 	out1 := together.Workers(ctx, gen(20), add(3), together.WithWorkerSize(5))
 	out2 := together.Workers(ctx, out1, subtract(3), together.WithWorkerSize(2))
-	var i int
+	var got int
 	for range together.Workers(ctx, out2, mw(add(3))) {
-		i++
+		got++
 	}
-	assert.Less(t, i, 5)
+	assert.Less(t, got, 5)
 }
 
 func TestPipelineWithEarlyCancelAtFirstStage(t *testing.T) {
@@ -157,9 +157,9 @@ func TestPipelineWithEarlyCancelAtFirstStage(t *testing.T) {
 
 	out1 := together.Workers(ctx, gen(20), mw(add(3)), together.WithWorkerSize(3))
 	out2 := together.Workers(ctx, out1, subtract(3), together.WithWorkerSize(2))
-	var i int
+	var got int
 	for range together.Workers(ctx, out2, add(3)) {
-		i++
+		got++
 	}
-	assert.Less(t, i, 5)
+	assert.Less(t, got, 5)
 }

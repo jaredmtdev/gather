@@ -100,10 +100,14 @@ linters:
     - path: _test.go$
       linters: [gosec]
       text: G404 
+    - path: _test.go$
+      linters: [err113]
     - path: workers.go
       linters:
       - cyclop
       - funlen
+    - linters: [revive]
+      text: "empty-block: this block is empty, you can remove it"
 
   disable:
     - unused # TODO: re-enable after tests/examples are finished
