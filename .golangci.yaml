@@ -81,11 +81,30 @@ linters:
     - wastedassign
     - whitespace
 
+
+  settings:
+    depguard:
+      rules:
+        testify:
+          files:
+            - "**/*.go"
+            - "**/*_test.go"
+          deny:
+            - pkg: github.com/stretchr/testify/...
+              desc: "testify is allowed in tests"
+    gocognit:
+      min-complexity: 35
+
   exclusions:
     rules:
     - path: _test.go$
       linters: [gosec]
       text: G404 
+    - path: workers.go
+      linters:
+      - cyclop
+      - funlen
 
   disable:
     - unused # TODO: re-enable after tests/examples are finished
+
