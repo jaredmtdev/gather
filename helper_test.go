@@ -3,6 +3,7 @@ package together_test
 import (
 	"context"
 	"math/rand"
+	"sync"
 	"sync/atomic"
 	"time"
 	"together"
@@ -17,8 +18,7 @@ type number interface {
 func gen[T number](n T) <-chan T {
 	out := make(chan T)
 	go func() {
-		var i T
-		for i = 0; i < n; i++ {
+		for i := T(0); i < n; i++ {
 			out <- i
 		}
 		close(out)
@@ -27,29 +27,30 @@ func gen[T number](n T) <-chan T {
 }
 
 // === handlers ===
+
 func convert[FROM number, TO number]() together.HandlerFunc[FROM, TO] {
-	return func(ctx context.Context, in FROM, scope *together.Scope[FROM]) (TO, error) {
+	return func(_ context.Context, in FROM, _ *together.Scope[FROM]) (TO, error) {
 		return TO(in), nil
 	}
 }
 
 func add[T number](num T) together.HandlerFunc[T, T] {
-	return func(ctx context.Context, in T, scope *together.Scope[T]) (T, error) {
+	return func(_ context.Context, in T, _ *together.Scope[T]) (T, error) {
 		return in + num, nil
 	}
 }
 func subtract[T number](num T) together.HandlerFunc[T, T] {
-	return func(ctx context.Context, in T, scope *together.Scope[T]) (T, error) {
+	return func(_ context.Context, in T, _ *together.Scope[T]) (T, error) {
 		return in - num, nil
 	}
 }
 func multiply[T number](num T) together.HandlerFunc[T, T] {
-	return func(ctx context.Context, in T, scope *together.Scope[T]) (T, error) {
+	return func(_ context.Context, in T, _ *together.Scope[T]) (T, error) {
 		return in * num, nil
 	}
 }
 func divide[T number](num T) together.HandlerFunc[T, T] {
-	return func(ctx context.Context, in T, scope *together.Scope[T]) (T, error) {
+	return func(_ context.Context, in T, _ *together.Scope[T]) (T, error) {
 		return in / num, nil
 	}
 }
@@ -71,9 +72,13 @@ func mwDelay[IN, OUT any](d time.Duration) together.Middleware[IN, OUT] {
 }
 
 func mwRandomDelay[IN, OUT any](seed int64, minDuration time.Duration, maxDuration time.Duration) together.Middleware[IN, OUT] {
-	r := rand.New(rand.NewSource(seed))
+	pool := &sync.Pool{
+		New: func() any { return rand.New(rand.NewSource(seed)) },
+	}
 	return func(next together.HandlerFunc[IN, OUT]) together.HandlerFunc[IN, OUT] {
 		return func(ctx context.Context, in IN, scope *together.Scope[IN]) (OUT, error) {
+			r := pool.Get().(*rand.Rand)
+			defer pool.Put(r)
 			randInterval := time.Duration(r.Int63n(int64(maxDuration - minDuration)))
 			delayTime := minDuration + randInterval
 			select {
