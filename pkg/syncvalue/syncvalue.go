@@ -2,6 +2,7 @@ package syncvalue
 
 import "sync"
 
+// Value - allow storing and loading of values while guarding against race conditions
 type Value[T any] struct {
 	mu    sync.RWMutex
 	value T
