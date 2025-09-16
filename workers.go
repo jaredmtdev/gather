@@ -18,8 +18,9 @@ type HandlerFunc[IN any, OUT any] func(ctx context.Context, in IN, scope *Scope[
 
 // workerStation - configures behavior of Workers.
 type workerStation struct {
-	workerSize int
-	bufferSize int
+	workerSize     int
+	bufferSize     int
+	orderPreserved bool
 }
 
 // Opt - options used to configure Workers.
@@ -45,6 +46,15 @@ func WithBufferSize(bufferSize int) Opt {
 	}
 }
 
+// WithOrderPreserved - preserves order of input to output
+// this functionality will utilize bufferSize to keep a buffer of results until they are ready to be sent in order
+// the workers will keep running but results are blocked until the "next" result is ready to send.
+func WithOrderPreserved() Opt {
+	return func(w *workerStation) {
+		w.orderPreserved = true
+	}
+}
+
 func newWorkerStation(opts []Opt) *workerStation {
 	ws := &workerStation{
 		workerSize: 1,
@@ -55,30 +65,38 @@ func newWorkerStation(opts []Opt) *workerStation {
 	return ws
 }
 
+// job - keeps track of index for optional ordered results.
+type job[T any] struct {
+	index uint64
+	val   T
+	skip  bool
+}
+
 // Workers - build a single pipeline stage based on the handler and options.
 func Workers[IN any, OUT any](ctx context.Context, in <-chan IN, handler HandlerFunc[IN, OUT], opts ...Opt) <-chan OUT {
 	ws := newWorkerStation(opts)
 
+	queue := make(chan job[IN], ws.bufferSize)
+	ordered := make(chan job[OUT], ws.bufferSize)
 	out := make(chan OUT, ws.bufferSize)
 
 	// using internal queue to allow retries to send back to queue
 	// since this block doesn't control closing of the in chan
-	queue := make(chan IN, ws.bufferSize)
-	wgPump := sync.WaitGroup{}
-	wgPump.Add(1)
 	wgJob := sync.WaitGroup{}
-	go func() {
-		defer wgPump.Done()
+	wgPump := sync.WaitGroup{}
+	wgPump.Go(func() {
+		var indexCounter uint64
 		for v := range in {
 			wgJob.Add(1)
 			select {
 			case <-ctx.Done():
 				wgJob.Done()
 				return
-			case queue <- v:
+			case queue <- job[IN]{val: v, index: indexCounter}:
+				indexCounter++
 			}
 		}
-	}()
+	})
 
 	go func() {
 		wgPump.Wait()
@@ -86,18 +104,18 @@ func Workers[IN any, OUT any](ctx context.Context, in <-chan IN, handler Handler
 		close(queue)
 	}()
 
-	enqueue := func(v IN) {
-		select {
-		case <-ctx.Done():
-		case queue <- v:
+	enqueue := func(index uint64) func(IN) {
+		return func(v IN) {
+			select {
+			case <-ctx.Done():
+			case queue <- job[IN]{val: v, index: index}:
+			}
 		}
 	}
 
 	wgWorker := sync.WaitGroup{}
-	wgWorker.Add(ws.workerSize)
 	for range ws.workerSize {
-		go func() {
-			defer wgWorker.Done()
+		wgWorker.Go(func() {
 			select {
 			case <-ctx.Done():
 				return
@@ -113,28 +131,67 @@ func Workers[IN any, OUT any](ctx context.Context, in <-chan IN, handler Handler
 				default:
 				}
 				scope := Scope[IN]{
-					enqueue:     enqueue,
+					enqueue:     enqueue(v.index),
 					wgJob:       &wgJob,
 					once:        &sync.Once{},
 					retryClosed: &syncvalue.Value[bool]{},
 				}
 
-				res, err := handler(ctx, v, &scope)
+				res, err := handler(ctx, v.val, &scope)
+				jobOut := job[OUT]{val: res, index: v.index}
 				if !scope.willRetry {
 					wgJob.Done()
 				}
-				if err == nil {
+				if ws.orderPreserved && !scope.willRetry {
+					if err != nil {
+						jobOut.skip = true
+					}
 					select {
 					case <-ctx.Done():
-						return
+						continue
+					case ordered <- jobOut:
+					}
+				} else if err == nil && !ws.orderPreserved {
+					select {
+					case <-ctx.Done():
+						continue
 					case out <- res:
 					}
 				}
 			}
-		}()
+		})
 	}
+
+	wgOrdered := sync.WaitGroup{}
+	wgOrdered.Go(func() {
+		var nextJobOut uint64
+		jobOutMap := map[uint64]job[OUT]{}
+		for jobOut := range ordered {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+			jobOutMap[jobOut.index] = jobOut
+			for v, ok := jobOutMap[nextJobOut]; ok; v, ok = jobOutMap[nextJobOut] {
+				delete(jobOutMap, v.index)
+				nextJobOut++
+				if v.skip {
+					continue
+				}
+				select {
+				case <-ctx.Done():
+					return
+				case out <- v.val:
+				}
+			}
+		}
+	})
+
 	go func() {
 		wgWorker.Wait()
+		close(ordered)
+		wgOrdered.Wait()
 		close(out)
 	}()
 	return out
