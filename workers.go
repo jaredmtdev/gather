@@ -71,16 +71,10 @@ type job[T any] struct {
 	skip  bool
 }
 
-// Workers - build a single pipeline stage based on the handler and options.
-func Workers[IN any, OUT any](ctx context.Context, in <-chan IN, handler HandlerFunc[IN, OUT], opts ...Opt) <-chan OUT {
-	ws := newWorkerStation(opts)
-
+// pump input data into queue for workers to process
+// the workers may also send data back to queue if a retry is triggered.
+func pump[IN any](ctx context.Context, ws *workerStation, in <-chan IN) (chan job[IN], *sync.WaitGroup) {
 	queue := make(chan job[IN], ws.bufferSize)
-	ordered := make(chan job[OUT], ws.bufferSize)
-	out := make(chan OUT, ws.bufferSize)
-
-	// using internal queue to allow retries to send back to queue
-	// separate channel needed because this block doesn't control closing of the in chan
 	wgJob := sync.WaitGroup{}
 	wgPump := sync.WaitGroup{}
 	wgPump.Go(func() {
@@ -102,6 +96,19 @@ func Workers[IN any, OUT any](ctx context.Context, in <-chan IN, handler Handler
 		wgJob.Wait()
 		close(queue)
 	}()
+	return queue, &wgJob
+}
+
+// Workers - build a single pipeline stage based on the handler and options.
+func Workers[IN any, OUT any](ctx context.Context, in <-chan IN, handler HandlerFunc[IN, OUT], opts ...Opt) <-chan OUT {
+	ws := newWorkerStation(opts)
+
+	ordered := make(chan job[OUT], ws.bufferSize)
+	out := make(chan OUT, ws.bufferSize)
+
+	// using internal queue to allow retries to send back to queue
+	// separate channel needed because this block doesn't control closing of the in chan
+	queue, wgJob := pump(ctx, ws, in)
 
 	enqueue := func(index uint64) func(IN) {
 		return func(v IN) {
@@ -131,7 +138,7 @@ func Workers[IN any, OUT any](ctx context.Context, in <-chan IN, handler Handler
 				}
 				scope := Scope[IN]{
 					enqueue:     enqueue(v.index),
-					wgJob:       &wgJob,
+					wgJob:       wgJob,
 					once:        &sync.Once{},
 					retryClosed: &syncvalue.Value[bool]{},
 				}
