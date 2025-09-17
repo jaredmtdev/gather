@@ -16,13 +16,17 @@ type number interface {
 
 // === generators ===
 
-func gen[T number](n T) <-chan T {
+func gen[T number](ctx context.Context, n T) <-chan T {
 	out := make(chan T)
 	go func() {
+		defer close(out)
 		for i := T(0); i < n; i++ {
-			out <- i
+			select {
+			case <-ctx.Done():
+				return
+			case out <- i:
+			}
 		}
-		close(out)
 	}()
 	return out
 }

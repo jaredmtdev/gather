@@ -47,8 +47,7 @@ func WithBufferSize(bufferSize int) Opt {
 }
 
 // WithOrderPreserved - preserves order of input to output
-// this functionality will utilize bufferSize to keep a buffer of results until they are ready to be sent in order
-// the workers will keep running but results are blocked until the "next" result is ready to send.
+// the workers will keep running but results are blocked from sending until the "next" result is ready to send.
 func WithOrderPreserved() Opt {
 	return func(w *workerStation) {
 		w.orderPreserved = true
@@ -81,7 +80,7 @@ func Workers[IN any, OUT any](ctx context.Context, in <-chan IN, handler Handler
 	out := make(chan OUT, ws.bufferSize)
 
 	// using internal queue to allow retries to send back to queue
-	// since this block doesn't control closing of the in chan
+	// separate channel needed because this block doesn't control closing of the in chan
 	wgJob := sync.WaitGroup{}
 	wgPump := sync.WaitGroup{}
 	wgPump.Go(func() {
@@ -151,7 +150,7 @@ func Workers[IN any, OUT any](ctx context.Context, in <-chan IN, handler Handler
 						continue
 					case ordered <- jobOut:
 					}
-				} else if err == nil && !ws.orderPreserved {
+				} else if !ws.orderPreserved && !scope.willRetry && err == nil {
 					select {
 					case <-ctx.Done():
 						continue

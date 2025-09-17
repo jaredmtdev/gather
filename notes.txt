@@ -13,10 +13,3 @@ TODO:
 
 examples ideas:
 -middlware: captures wrapped errors and sends to error channel that is used for all stages
--use closures to chain stages together nicely
-
-
-
-notes about preserving order:
--need to make a type that wraps the input and tracks the sequence number
--use map+sync.Cond to control flow

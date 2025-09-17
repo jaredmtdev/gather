@@ -20,9 +20,6 @@ import (
 type WorkerBuilder[IN any, OUT any] func(ctx context.Context, in <-chan IN, f func(IN) OUT) <-chan OUT
 
 func Pipe[T any](in <-chan T, stages ...func(in <-chan T) <-chan T) <-chan T {
-	if len(stages) == 0 {
-		panic("must have at least 1 stage!")
-	}
 	out := in
 	for _, stage := range stages {
 		out = stage(out)
