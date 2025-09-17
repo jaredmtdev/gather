@@ -78,11 +78,12 @@ type workerStation[IN, OUT any] struct {
 type job[T any] struct {
 	index uint64
 	val   T
-	skip  bool
+	err   error
 }
 
-// Pump input data into queue for workers to process
-// the workers may also send data back to queue if a retry is triggered.
+// Pump - pumps input data into queue for workers to process.
+// this "middleman" logic is used to allow retries to send jobs back into queue
+// note that we can't send to in chan because we don't control when in chan is closed.
 func (ws *workerStation[IN, OUT]) Pump(ctx context.Context, in <-chan IN) {
 	wgPump := sync.WaitGroup{}
 	wgPump.Go(func() {
@@ -106,6 +107,7 @@ func (ws *workerStation[IN, OUT]) Pump(ctx context.Context, in <-chan IN) {
 	}()
 }
 
+// enqueueFunc - builds the enqueue func used during retries to send input back into queue.
 func (ws *workerStation[IN, OUT]) enqueueFunc(ctx context.Context, index uint64) func(IN) {
 	return func(v IN) {
 		select {
@@ -115,6 +117,27 @@ func (ws *workerStation[IN, OUT]) enqueueFunc(ctx context.Context, index uint64)
 	}
 }
 
+// SendResult - sends result to the appropriate channel.
+func (ws *workerStation[IN, OUT]) SendResult(ctx context.Context, jobOut job[OUT], err error) {
+	defer ws.wgJob.Done()
+	if ws.orderPreserved {
+		select {
+		case <-ctx.Done():
+			return
+		case ws.ordered <- jobOut:
+		}
+		return
+	}
+	if err == nil {
+		select {
+		case <-ctx.Done():
+			return
+		case ws.out <- jobOut.val:
+		}
+	}
+}
+
+// StartWorker - starts a single worker to ingest the queue.
 func (ws *workerStation[IN, OUT]) StartWorker(ctx context.Context) {
 	select {
 	case <-ctx.Done():
@@ -138,31 +161,17 @@ func (ws *workerStation[IN, OUT]) StartWorker(ctx context.Context) {
 		}
 
 		res, err := ws.handler(ctx, jobIn.val, &scope)
-		jobOut := job[OUT]{val: res, index: jobIn.index}
+		jobOut := job[OUT]{val: res, err: err, index: jobIn.index}
 		if !scope.willRetry {
-			ws.wgJob.Done()
-		}
-		if ws.orderPreserved && !scope.willRetry {
-			if err != nil {
-				jobOut.skip = true
-			}
-			select {
-			case <-ctx.Done():
-				continue
-			case ws.ordered <- jobOut:
-			}
-		} else if !ws.orderPreserved && !scope.willRetry && err == nil {
-			select {
-			case <-ctx.Done():
-				continue
-			case ws.out <- res:
-			}
+			ws.SendResult(ctx, jobOut, err)
 		}
 	}
 }
 
+// Reorder - used hold the result until the "next" result is ready to be sent
+// this will reorder to make sure all results are sent in the same order of their inputs.
 func (ws *workerStation[IN, OUT]) Reorder(ctx context.Context) {
-	var nextJobOut uint64
+	var nextJobOutIndex uint64
 	jobOutMap := map[uint64]job[OUT]{}
 	for jobOut := range ws.ordered {
 		select {
@@ -171,16 +180,16 @@ func (ws *workerStation[IN, OUT]) Reorder(ctx context.Context) {
 		default:
 		}
 		jobOutMap[jobOut.index] = jobOut
-		for v, ok := jobOutMap[nextJobOut]; ok; v, ok = jobOutMap[nextJobOut] {
-			delete(jobOutMap, v.index)
-			nextJobOut++
-			if v.skip {
+		for jobOutCached, ok := jobOutMap[nextJobOutIndex]; ok; jobOutCached, ok = jobOutMap[nextJobOutIndex] {
+			delete(jobOutMap, jobOutCached.index)
+			nextJobOutIndex++
+			if jobOutCached.err != nil {
 				continue
 			}
 			select {
 			case <-ctx.Done():
 				return
-			case ws.out <- v.val:
+			case ws.out <- jobOutCached.val:
 			}
 		}
 	}
@@ -196,8 +205,6 @@ func Workers[IN any, OUT any](ctx context.Context, in <-chan IN, handler Handler
 	ws.ordered = make(chan job[OUT], ws.bufferSize)
 	ws.out = make(chan OUT, ws.bufferSize)
 
-	// using internal queue to allow retries to send back to queue
-	// separate channel needed because this block doesn't control closing of the in chan
 	ws.Pump(ctx, in)
 
 	wgWorker := sync.WaitGroup{}
