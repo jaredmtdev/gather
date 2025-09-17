@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"together"
 )
 
@@ -26,7 +27,7 @@ func TestScopeRetry(t *testing.T) {
 	})
 
 	var got int
-	for range together.Workers(ctx, gen(20), handler, together.WithWorkerSize(5)) {
+	for range together.Workers(ctx, gen(ctx, 20), handler, together.WithWorkerSize(5)) {
 		got++
 	}
 	assert.Equal(t, 20, got)
@@ -50,7 +51,34 @@ func TestScopeRetryAfter(t *testing.T) {
 
 		start := time.Now()
 		var got int
-		for range together.Workers(ctx, gen(10), handler, together.WithWorkerSize(10), together.WithBufferSize(10)) {
+		for range together.Workers(ctx, gen(ctx, 10), handler, together.WithWorkerSize(10), together.WithBufferSize(10)) {
+			got++
+		}
+		duration := time.Since(start)
+		assert.Equal(t, 10, got)
+		assert.Equal(t, int32(13), totalAttempts.Load())
+		assert.LessOrEqual(t, delayUntilRetry.Milliseconds(), duration.Milliseconds())
+	})
+}
+
+func TestScopeRetryAfterWhenNoError(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx := context.Background()
+		totalAttempts := atomic.Int32{}
+		delayUntilRetry := 100 * time.Millisecond
+
+		handler := together.HandlerFunc[int, int](func(ctx context.Context, in int, scope *together.Scope[int]) (int, error) {
+			totalAttempts.Add(1)
+			if in == 2 || in == 3 {
+				scope.RetryAfter(ctx, in+1, delayUntilRetry)
+				return 0, nil
+			}
+			return in * 2, nil
+		})
+
+		start := time.Now()
+		var got int
+		for range together.Workers(ctx, gen(ctx, 10), handler, together.WithWorkerSize(10), together.WithBufferSize(10)) {
 			got++
 		}
 		duration := time.Since(start)
@@ -77,7 +105,7 @@ func TestScopeRetryAfterOnLastItem(t *testing.T) {
 
 		start := time.Now()
 		var got int
-		for range together.Workers(ctx, gen(10), handler, together.WithWorkerSize(2), together.WithBufferSize(1)) {
+		for range together.Workers(ctx, gen(ctx, 10), handler, together.WithWorkerSize(2), together.WithBufferSize(1)) {
 			got++
 		}
 		duration := time.Since(start)
@@ -103,7 +131,7 @@ func TestScopeWithMultipleRetries(t *testing.T) {
 	})
 
 	var got int
-	for range together.Workers(ctx, gen(20), handler, together.WithWorkerSize(5)) {
+	for range together.Workers(ctx, gen(ctx, 20), handler, together.WithWorkerSize(5)) {
 		got++
 	}
 	assert.Equal(t, 20, got)
@@ -126,7 +154,7 @@ func TestScopeGo(t *testing.T) {
 	})
 
 	var got int
-	for range together.Workers(ctx, gen(20), handler, together.WithWorkerSize(5)) {
+	for range together.Workers(ctx, gen(ctx, 20), handler, together.WithWorkerSize(5)) {
 		got++
 	}
 	assert.Equal(t, 20, got)
@@ -151,7 +179,7 @@ func TestScopeGoNested(t *testing.T) {
 	})
 
 	var got int
-	for range together.Workers(ctx, gen(20), handler, together.WithWorkerSize(5)) {
+	for range together.Workers(ctx, gen(ctx, 20), handler, together.WithWorkerSize(5)) {
 		got++
 	}
 	assert.Equal(t, 20, got)
@@ -175,7 +203,7 @@ func TestScopeMultipleGo(t *testing.T) {
 	})
 
 	var got int
-	for range together.Workers(ctx, gen(20), handler, together.WithWorkerSize(5)) {
+	for range together.Workers(ctx, gen(ctx, 20), handler, together.WithWorkerSize(5)) {
 		got++
 	}
 	assert.Equal(t, 20, got)
@@ -203,7 +231,7 @@ func TestScopeGoWithRetry(t *testing.T) {
 		return in * 2, nil
 	})
 
-	for range together.Workers(ctx, gen(20), handler, together.WithWorkerSize(5)) {
+	for range together.Workers(ctx, gen(ctx, 20), handler, together.WithWorkerSize(5)) {
 	}
 
 	close(panicCh)
@@ -238,7 +266,7 @@ func TestScopeGoThenRetry(t *testing.T) {
 		return in * 2, nil
 	})
 
-	for range together.Workers(ctx, gen(20), handler, together.WithWorkerSize(5)) {
+	for range together.Workers(ctx, gen(ctx, 20), handler, together.WithWorkerSize(5)) {
 	}
 	close(panicCh)
 	var actualPanics int
@@ -268,10 +296,49 @@ func TestScopeRetryThenGo(t *testing.T) {
 	})
 
 	var got int
-	for range together.Workers(ctx, gen(20), handler, together.WithWorkerSize(5)) {
+	for range together.Workers(ctx, gen(ctx, 20), handler, together.WithWorkerSize(5)) {
 		got++
 	}
 	assert.Equal(t, 20, got)
 	assert.Equal(t, int32(3), counter.Load())
 	assert.Equal(t, int32(23), totalAttempts.Load())
+}
+
+func TestOrderedWorkersAndScopeRetryThenGo(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx := context.Background()
+		totalAttempts := atomic.Int32{}
+		counter := atomic.Int32{}
+
+		opts := []together.Opt{
+			together.WithWorkerSize(5),
+			together.WithBufferSize(3),
+			together.WithOrderPreserved(),
+		}
+
+		mw := mwRandomDelay[int, int](time.Now().UnixNano(), 0, time.Second)
+
+		handler := together.HandlerFunc[int, int](func(ctx context.Context, in int, scope *together.Scope[int]) (int, error) {
+			totalAttempts.Add(1)
+			if in == 2 || in == 3 {
+				scope.Retry(ctx, in+1)
+				scope.Go(func() {
+					counter.Add(1)
+				})
+				return 0, errors.New("invalid number")
+			}
+			return in * 2, nil
+		})
+
+		var got int
+		for v := range together.Workers(ctx, gen(ctx, 1000), mw(handler), opts...) {
+			if got != 2 && got != 3 {
+				require.Equal(t, got*2, v)
+			}
+			got++
+		}
+		assert.Equal(t, 1000, got)
+		assert.Equal(t, int32(3), counter.Load())
+		assert.Equal(t, int32(1003), totalAttempts.Load())
+	})
 }

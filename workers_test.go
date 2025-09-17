@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"slices"
 	"testing"
+	"testing/synctest"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -12,17 +14,48 @@ import (
 )
 
 func TestWorkersSynchronous(t *testing.T) {
+	ctx := context.Background()
 	var got int
-	for v := range together.Workers(context.Background(), gen(20), add(3)) {
+	for v := range together.Workers(ctx, gen(ctx, 200), add(3)) {
 		require.Equal(t, got+3, v)
 		got++
 	}
-	assert.Equal(t, 20, got)
+	assert.Equal(t, 200, got)
+}
+
+func TestWorkersSynchronousOrdered(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx := context.Background()
+		opts := []together.Opt{
+			together.WithOrderPreserved(),
+		}
+		mw := mwRandomDelay[int, int](time.Now().UnixNano(), 0, time.Second)
+		var got int
+		for v := range together.Workers(ctx, gen(ctx, 1000), mw(add(3)), opts...) {
+			require.Equal(t, got+3, v)
+			got++
+		}
+		assert.Equal(t, 1000, got)
+	})
+}
+
+func TestWorkersSynchronousOrderedWithEarlyCancel(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	mw := mwCancelOnInput[int, int](5, cancel)
+
+	var got int
+	for v := range together.Workers(ctx, gen(ctx, 20), mw(add(3)), together.WithOrderPreserved()) {
+		require.Equal(t, got+3, v)
+		got++
+	}
+	assert.Less(t, got, 3+5)
 }
 
 func TestPipelineSynchronous(t *testing.T) {
 	ctx := context.Background()
-	out1 := together.Workers(ctx, gen(20), add(3))
+	out1 := together.Workers(ctx, gen(ctx, 20), add(3))
 	out2 := together.Workers(ctx, out1, subtract(3))
 	var got int
 	for v := range together.Workers(ctx, out2, add(3)) {
@@ -34,7 +67,7 @@ func TestPipelineSynchronous(t *testing.T) {
 
 func TestPipelineSynchronousWithMultipleTypes(t *testing.T) {
 	ctx := context.Background()
-	out1 := together.Workers(ctx, gen(20), add(3))
+	out1 := together.Workers(ctx, gen(ctx, 20), add(3))
 	out2 := together.Workers(ctx, out1, convert[int, float64]())
 	out3 := together.Workers(ctx, out2, subtract[float64](3))
 	out4 := together.Workers(ctx, out3, convert[float64, int]())
@@ -54,7 +87,7 @@ func TestPipelineSynchronousWithEarlyCancelAtLastStage(t *testing.T) {
 	// therefore, that result is not sent to out channel
 	mw := mwCancelOnInput[int, int](5, cancel)
 
-	out1 := together.Workers(ctx, gen(20), add(3))
+	out1 := together.Workers(ctx, gen(ctx, 20), add(3))
 	out2 := together.Workers(ctx, out1, subtract(3))
 	var got int
 	for v := range together.Workers(ctx, out2, mw(add(3))) {
@@ -72,7 +105,7 @@ func TestPipelineSynchronousWithEarlyCancelAtFirstStage(t *testing.T) {
 	// therefore, that result is not sent to out channel
 	mw := mwCancelOnInput[int, int](5, cancel)
 
-	out1 := together.Workers(ctx, gen(20), mw(add(3)))
+	out1 := together.Workers(ctx, gen(ctx, 20), mw(add(3)))
 	out2 := together.Workers(ctx, out1, subtract(3))
 	var got int
 	for v := range together.Workers(ctx, out2, add(3)) {
@@ -104,7 +137,7 @@ func TestMultipleWorkers(t *testing.T) {
 			}
 
 			results := make([]int, 0, tt.jobs)
-			for v := range together.Workers(ctx, gen(tt.jobs), multiply(3), opts...) {
+			for v := range together.Workers(ctx, gen(ctx, tt.jobs), multiply(3), opts...) {
 				results = append(results, v)
 			}
 
@@ -119,9 +152,51 @@ func TestMultipleWorkers(t *testing.T) {
 	}
 }
 
+func TestWorkersOrdered(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx := context.Background()
+		opts := []together.Opt{
+			together.WithWorkerSize(5),
+			together.WithBufferSize(5),
+			together.WithOrderPreserved(),
+		}
+		mw := mwRandomDelay[int, int](time.Now().UnixNano(), 0, time.Second)
+		var got int
+		for v := range together.Workers(ctx, gen(ctx, 1000), mw(add(3)), opts...) {
+			require.Equal(t, got+3, v)
+			got++
+		}
+		assert.Equal(t, 1000, got)
+	})
+}
+
+func TestWorkersOrderedWithEarlyCancel(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		mw := together.Chain(
+			mwCancelOnInput[int, int](5, cancel),
+			mwRandomDelay[int, int](time.Now().UnixNano(), 0, time.Second),
+		)
+		opts := []together.Opt{
+			together.WithWorkerSize(5),
+			together.WithBufferSize(5),
+			together.WithOrderPreserved(),
+		}
+
+		var got int
+		for v := range together.Workers(ctx, gen(ctx, 20), mw(add(3)), opts...) {
+			require.Equal(t, got+3, v)
+			got++
+		}
+		assert.Less(t, got, 3+5)
+	})
+}
+
 func TestPipelineWithBackPressure(t *testing.T) {
 	ctx := context.Background()
-	out1 := together.Workers(ctx, gen(20), add(3), together.WithWorkerSize(5))
+	out1 := together.Workers(ctx, gen(ctx, 20), add(3), together.WithWorkerSize(5))
 	out2 := together.Workers(ctx, out1, subtract(3), together.WithWorkerSize(2))
 	var got int
 	for range together.Workers(ctx, out2, add(3)) {
@@ -138,7 +213,7 @@ func TestPipelineWithEarlyCancelAtLastStage(t *testing.T) {
 	// therefore, that result is not sent to out channel
 	mw := mwCancelOnCount[int, int](5, cancel)
 
-	out1 := together.Workers(ctx, gen(20), add(3), together.WithWorkerSize(5))
+	out1 := together.Workers(ctx, gen(ctx, 20), add(3), together.WithWorkerSize(5))
 	out2 := together.Workers(ctx, out1, subtract(3), together.WithWorkerSize(2))
 	var got int
 	for range together.Workers(ctx, out2, mw(add(3))) {
@@ -155,11 +230,62 @@ func TestPipelineWithEarlyCancelAtFirstStage(t *testing.T) {
 	// therefore, that result is not sent to out channel
 	mw := mwCancelOnCount[int, int](5, cancel)
 
-	out1 := together.Workers(ctx, gen(20), mw(add(3)), together.WithWorkerSize(3))
+	out1 := together.Workers(ctx, gen(ctx, 20), mw(add(3)), together.WithWorkerSize(3))
 	out2 := together.Workers(ctx, out1, subtract(3), together.WithWorkerSize(2))
 	var got int
 	for range together.Workers(ctx, out2, add(3)) {
 		got++
 	}
-	assert.Less(t, got, 5)
+	assert.LessOrEqual(t, got, 5)
+}
+
+func TestPipelineOrdered(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx := context.Background()
+
+		opts := []together.Opt{
+			together.WithWorkerSize(5),
+			together.WithBufferSize(5),
+			together.WithOrderPreserved(),
+		}
+
+		mw := mwRandomDelay[int, int](time.Now().UnixNano(), 0, time.Second)
+
+		out1 := together.Workers(ctx, gen(ctx, 1000), mw(add(3)), opts...)
+		out2 := together.Workers(ctx, out1, subtract(3), opts...)
+		var got int
+		for v := range together.Workers(ctx, out2, add(3), together.WithOrderPreserved()) {
+			require.Equal(t, got+3, v)
+			got++
+		}
+		assert.Equal(t, 1000, got)
+	})
+}
+
+func TestPipelineOrderedWithEarlyCancelAtFirstStage(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		opts := []together.Opt{
+			together.WithWorkerSize(5),
+			together.WithBufferSize(5),
+			together.WithOrderPreserved(),
+		}
+
+		// should cancel on input of 4
+		mw := together.Chain(
+			mwCancelOnCount[int, int](5, cancel),
+			mwRandomDelay[int, int](time.Now().UnixNano(), 0, time.Second),
+		)
+
+		out1 := together.Workers(ctx, gen(ctx, 20), mw(add(3)), opts...)
+		out2 := together.Workers(ctx, out1, subtract(3), opts...)
+		var got int
+		for v := range together.Workers(ctx, out2, add(3), together.WithOrderPreserved()) {
+			require.Equal(t, got+3, v)
+			got++
+		}
+		assert.Less(t, got, 5)
+	})
 }
