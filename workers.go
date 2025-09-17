@@ -16,22 +16,22 @@ import (
 //   - use workerHandler for retries, ReplyTo pattern, etc
 type HandlerFunc[IN any, OUT any] func(ctx context.Context, in IN, scope *Scope[IN]) (OUT, error)
 
-// workerStation - configures behavior of Workers.
-type workerStation struct {
+// workerOpts - configures behavior of Workers.
+type workerOpts struct {
 	workerSize     int
 	bufferSize     int
 	orderPreserved bool
 }
 
 // Opt - options used to configure Workers.
-type Opt func(w *workerStation)
+type Opt func(w *workerOpts)
 
 // WithWorkerSize - set number of concurrent workers.
 func WithWorkerSize(workerSize int) Opt {
 	if workerSize <= 0 {
 		panic(fmt.Sprintf("must use at least 1 worker! workerSize: %v", workerSize))
 	}
-	return func(w *workerStation) {
+	return func(w *workerOpts) {
 		w.workerSize = workerSize
 	}
 }
@@ -41,7 +41,7 @@ func WithBufferSize(bufferSize int) Opt {
 	if bufferSize < 0 {
 		panic(fmt.Sprintf("buffer must be at least 0! bufferSize: %v", bufferSize))
 	}
-	return func(w *workerStation) {
+	return func(w *workerOpts) {
 		w.bufferSize = bufferSize
 	}
 }
@@ -49,19 +49,29 @@ func WithBufferSize(bufferSize int) Opt {
 // WithOrderPreserved - preserves order of input to output
 // the workers will keep running but results are blocked from sending until the "next" result is ready to send.
 func WithOrderPreserved() Opt {
-	return func(w *workerStation) {
+	return func(w *workerOpts) {
 		w.orderPreserved = true
 	}
 }
 
-func newWorkerStation(opts []Opt) *workerStation {
-	ws := &workerStation{
+func newWorkerOpts(opts []Opt) *workerOpts {
+	wo := &workerOpts{
 		workerSize: 1,
 	}
 	for _, opt := range opts {
-		opt(ws)
+		opt(wo)
 	}
-	return ws
+	return wo
+}
+
+type workerStation[IN, OUT any] struct {
+	*workerOpts
+
+	queue   chan job[IN]
+	ordered chan job[OUT]
+	out     chan OUT
+	wgJob   sync.WaitGroup
+	handler HandlerFunc[IN, OUT]
 }
 
 // job - keeps track of index for optional ordered results.
@@ -71,21 +81,19 @@ type job[T any] struct {
 	skip  bool
 }
 
-// pump input data into queue for workers to process
+// Pump input data into queue for workers to process
 // the workers may also send data back to queue if a retry is triggered.
-func pump[IN any](ctx context.Context, ws *workerStation, in <-chan IN) (chan job[IN], *sync.WaitGroup) {
-	queue := make(chan job[IN], ws.bufferSize)
-	wgJob := sync.WaitGroup{}
+func (ws *workerStation[IN, OUT]) Pump(ctx context.Context, in <-chan IN) {
 	wgPump := sync.WaitGroup{}
 	wgPump.Go(func() {
 		var indexCounter uint64
 		for v := range in {
-			wgJob.Add(1)
+			ws.wgJob.Add(1)
 			select {
 			case <-ctx.Done():
-				wgJob.Done()
+				ws.wgJob.Done()
 				return
-			case queue <- job[IN]{val: v, index: indexCounter}:
+			case ws.queue <- job[IN]{val: v, index: indexCounter}:
 				indexCounter++
 			}
 		}
@@ -93,112 +101,124 @@ func pump[IN any](ctx context.Context, ws *workerStation, in <-chan IN) (chan jo
 
 	go func() {
 		wgPump.Wait()
-		wgJob.Wait()
-		close(queue)
+		ws.wgJob.Wait()
+		close(ws.queue)
 	}()
-	return queue, &wgJob
+}
+
+func (ws *workerStation[IN, OUT]) enqueueFunc(ctx context.Context, index uint64) func(IN) {
+	return func(v IN) {
+		select {
+		case <-ctx.Done():
+		case ws.queue <- job[IN]{val: v, index: index}:
+		}
+	}
+}
+
+func (ws *workerStation[IN, OUT]) StartWorker(ctx context.Context) {
+	select {
+	case <-ctx.Done():
+		return
+	default:
+	}
+
+	for jobIn := range ws.queue {
+		select {
+		case <-ctx.Done():
+			ws.wgJob.Done()
+			// drain any remaining jobs in queue to zero out the wait group
+			continue
+		default:
+		}
+		scope := Scope[IN]{
+			enqueue:     ws.enqueueFunc(ctx, jobIn.index),
+			wgJob:       &ws.wgJob,
+			once:        &sync.Once{},
+			retryClosed: &syncvalue.Value[bool]{},
+		}
+
+		res, err := ws.handler(ctx, jobIn.val, &scope)
+		jobOut := job[OUT]{val: res, index: jobIn.index}
+		if !scope.willRetry {
+			ws.wgJob.Done()
+		}
+		if ws.orderPreserved && !scope.willRetry {
+			if err != nil {
+				jobOut.skip = true
+			}
+			select {
+			case <-ctx.Done():
+				continue
+			case ws.ordered <- jobOut:
+			}
+		} else if !ws.orderPreserved && !scope.willRetry && err == nil {
+			select {
+			case <-ctx.Done():
+				continue
+			case ws.out <- res:
+			}
+		}
+	}
+}
+
+func (ws *workerStation[IN, OUT]) Reorder(ctx context.Context) {
+	var nextJobOut uint64
+	jobOutMap := map[uint64]job[OUT]{}
+	for jobOut := range ws.ordered {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+		jobOutMap[jobOut.index] = jobOut
+		for v, ok := jobOutMap[nextJobOut]; ok; v, ok = jobOutMap[nextJobOut] {
+			delete(jobOutMap, v.index)
+			nextJobOut++
+			if v.skip {
+				continue
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case ws.out <- v.val:
+			}
+		}
+	}
 }
 
 // Workers - build a single pipeline stage based on the handler and options.
 func Workers[IN any, OUT any](ctx context.Context, in <-chan IN, handler HandlerFunc[IN, OUT], opts ...Opt) <-chan OUT {
-	ws := newWorkerStation(opts)
-
-	ordered := make(chan job[OUT], ws.bufferSize)
-	out := make(chan OUT, ws.bufferSize)
+	ws := &workerStation[IN, OUT]{
+		workerOpts: newWorkerOpts(opts),
+		handler:    handler,
+	}
+	ws.queue = make(chan job[IN], ws.bufferSize)
+	ws.ordered = make(chan job[OUT], ws.bufferSize)
+	ws.out = make(chan OUT, ws.bufferSize)
 
 	// using internal queue to allow retries to send back to queue
 	// separate channel needed because this block doesn't control closing of the in chan
-	queue, wgJob := pump(ctx, ws, in)
-
-	enqueue := func(index uint64) func(IN) {
-		return func(v IN) {
-			select {
-			case <-ctx.Done():
-			case queue <- job[IN]{val: v, index: index}:
-			}
-		}
-	}
+	ws.Pump(ctx, in)
 
 	wgWorker := sync.WaitGroup{}
 	for range ws.workerSize {
 		wgWorker.Go(func() {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
-
-			for v := range queue {
-				select {
-				case <-ctx.Done():
-					wgJob.Done()
-					// drain any remaining jobs in queue to zero out the wait group
-					continue
-				default:
-				}
-				scope := Scope[IN]{
-					enqueue:     enqueue(v.index),
-					wgJob:       wgJob,
-					once:        &sync.Once{},
-					retryClosed: &syncvalue.Value[bool]{},
-				}
-
-				res, err := handler(ctx, v.val, &scope)
-				jobOut := job[OUT]{val: res, index: v.index}
-				if !scope.willRetry {
-					wgJob.Done()
-				}
-				if ws.orderPreserved && !scope.willRetry {
-					if err != nil {
-						jobOut.skip = true
-					}
-					select {
-					case <-ctx.Done():
-						continue
-					case ordered <- jobOut:
-					}
-				} else if !ws.orderPreserved && !scope.willRetry && err == nil {
-					select {
-					case <-ctx.Done():
-						continue
-					case out <- res:
-					}
-				}
-			}
+			ws.StartWorker(ctx)
 		})
 	}
 
 	wgOrdered := sync.WaitGroup{}
-	wgOrdered.Go(func() {
-		var nextJobOut uint64
-		jobOutMap := map[uint64]job[OUT]{}
-		for jobOut := range ordered {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
-			jobOutMap[jobOut.index] = jobOut
-			for v, ok := jobOutMap[nextJobOut]; ok; v, ok = jobOutMap[nextJobOut] {
-				delete(jobOutMap, v.index)
-				nextJobOut++
-				if v.skip {
-					continue
-				}
-				select {
-				case <-ctx.Done():
-					return
-				case out <- v.val:
-				}
-			}
-		}
-	})
+	if ws.orderPreserved {
+		wgOrdered.Go(func() {
+			ws.Reorder(ctx)
+		})
+	}
 
 	go func() {
 		wgWorker.Wait()
-		close(ordered)
+		close(ws.ordered)
 		wgOrdered.Wait()
-		close(out)
+		close(ws.out)
 	}()
-	return out
+	return ws.out
 }
