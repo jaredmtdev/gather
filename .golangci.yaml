@@ -93,7 +93,7 @@ linters:
             - pkg: github.com/stretchr/testify/...
               desc: "testify is allowed in tests"
     gocognit:
-      min-complexity: 60
+      min-complexity: 20
 
   exclusions:
     rules:
