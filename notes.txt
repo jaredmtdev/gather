@@ -2,14 +2,4 @@ TODO:
 
 -setup benchmarks
 -can we provide any mechanism for easy sharding?
--how to handle maintaining order of results even if processing out of order?
--test Scope
--have simple examples + possible real-world examples
--include WithErrChan()? this way middleware can wrap errors and get the full details sent
---no: there's too many ways to design this and it would add complexity. instead: use middleware for shared err chan + wrapped errors
--give an example that uses closures such that you have less input parameters - enabling you to chain workers
 -should I give option for infinite go routines (if user sets to 0)?
-
-
-examples ideas:
--middlware: captures wrapped errors and sends to error channel that is used for all stages
