@@ -18,6 +18,8 @@ type Scope[IN any] struct {
 }
 
 // RetryAfter - retry the request after "after" time passes.
+// only one retry can be done at a time for each job.
+// any extra retries will be ignored.
 func (s *Scope[IN]) RetryAfter(ctx context.Context, in IN, after time.Duration) {
 	if s.retryClosed.Load() {
 		panic("Invalid attempt to retry. Retries can only be executed BEFORE spawning new go routines.")
@@ -41,7 +43,7 @@ func (s *Scope[IN]) Retry(ctx context.Context, in IN) {
 }
 
 // Go - allow your handler to safely spin up a new go routine (in addition to the worker go routine).
-// the worker will stay alive until this go routine completes.
+// the worker will not shut down while this go routine is running.
 func (s *Scope[IN]) Go(f func()) {
 	s.retryClosed.Store(true)
 	s.wgJob.Go(f)
