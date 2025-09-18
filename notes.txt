@@ -1,5 +1,4 @@
 TODO:
 
--setup benchmarks
+-set up a performance test that tests against baseline
 -can we provide any mechanism for easy sharding?
--should I give option for infinite go routines (if user sets to 0)?

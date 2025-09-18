@@ -16,8 +16,12 @@ type number interface {
 
 // === generators ===
 
-func gen[T number](ctx context.Context, n T) <-chan T {
-	out := make(chan T)
+func gen[T number](ctx context.Context, n T, buffer ...int) <-chan T {
+	var bufferSize int
+	if len(buffer) > 0 && buffer[0] > 0 {
+		bufferSize = buffer[0]
+	}
+	out := make(chan T, bufferSize)
 	go func() {
 		defer close(out)
 		for i := T(0); i < n; i++ {
