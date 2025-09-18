@@ -56,6 +56,7 @@ func newWorkerOpts(opts []Opt) *workerOpts {
 	return wo
 }
 
+// workerStation - internal functionality used by Workers.
 type workerStation[IN, OUT any] struct {
 	*workerOpts
 
@@ -99,7 +100,7 @@ func (ws *workerStation[IN, OUT]) Enqueue(ctx context.Context, in <-chan IN) {
 	}()
 }
 
-// buildEnqueueFunc - builds the enqueue func used during retries to send input back into queue.
+// buildEnqueueFunc - builds the enqueue func used during retries to send (possibly  modified) input back into queue.
 func (ws *workerStation[IN, OUT]) buildEnqueueFunc(ctx context.Context, index uint64) func(IN) {
 	return func(v IN) {
 		select {
@@ -109,7 +110,7 @@ func (ws *workerStation[IN, OUT]) buildEnqueueFunc(ctx context.Context, index ui
 	}
 }
 
-// SendResult - sends result to the appropriate channel.
+// SendResult - sends result from worker to the next step (either out or reorder).
 func (ws *workerStation[IN, OUT]) SendResult(ctx context.Context, jobOut job[OUT], err error) {
 	defer ws.wgJob.Done()
 	if ws.orderPreserved {
@@ -160,28 +161,28 @@ func (ws *workerStation[IN, OUT]) StartWorker(ctx context.Context) {
 	}
 }
 
-// Reorder - used hold the result until the "next" result is ready to be sent
-// this will reorder to make sure all results are sent in the same order of their inputs.
+// Reorder - used to cache the result until the "next" result is cached and ready to be sent to out chan
+// in other words: reorder to make sure all results are sent in the same order of their inputs.
 func (ws *workerStation[IN, OUT]) Reorder(ctx context.Context) {
 	var nextJobOutIndex uint64
-	jobOutMap := map[uint64]job[OUT]{}
-	for jobOut := range ws.ordered {
+	jobOutCache := map[uint64]job[OUT]{}
+	for jobOutReceived := range ws.ordered {
 		select {
 		case <-ctx.Done():
 			return
 		default:
 		}
-		jobOutMap[jobOut.index] = jobOut
-		for jobOutCached, ok := jobOutMap[nextJobOutIndex]; ok; jobOutCached, ok = jobOutMap[nextJobOutIndex] {
-			delete(jobOutMap, jobOutCached.index)
+		jobOutCache[jobOutReceived.index] = jobOutReceived
+		for jobOut, ok := jobOutCache[nextJobOutIndex]; ok; jobOut, ok = jobOutCache[nextJobOutIndex] {
+			delete(jobOutCache, jobOut.index)
 			nextJobOutIndex++
-			if jobOutCached.err != nil {
+			if jobOut.err != nil {
 				continue
 			}
 			select {
 			case <-ctx.Done():
 				return
-			case ws.out <- jobOutCached.val:
+			case ws.out <- jobOut.val:
 			}
 		}
 	}
