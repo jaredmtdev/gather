@@ -8,14 +8,6 @@ import (
 	"together/pkg/syncvalue"
 )
 
-// HandlerFunc - function used to handle a single request sent to the worker
-// error handling done here. user can:
-//   - cancel the context if needed for immediate shutdown
-//   - for graceful shutdown: user controls generator. can just close in chan and then let all downstream stages finish
-//   - send to their own err channel (which could be processed by another Workers)
-//   - use workerHandler for retries, ReplyTo pattern, etc
-type HandlerFunc[IN any, OUT any] func(ctx context.Context, in IN, scope *Scope[IN]) (OUT, error)
-
 // workerOpts - configures behavior of Workers.
 type workerOpts struct {
 	workerSize     int
@@ -81,12 +73,12 @@ type job[T any] struct {
 	err   error
 }
 
-// Pump - pumps input data into queue for workers to process.
+// Enqueue - enqueues input data for workers to process.
 // this "middleman" logic is used to allow retries to send jobs back into queue
 // note that we can't send to in chan because we don't control when in chan is closed.
-func (ws *workerStation[IN, OUT]) Pump(ctx context.Context, in <-chan IN) {
-	wgPump := sync.WaitGroup{}
-	wgPump.Go(func() {
+func (ws *workerStation[IN, OUT]) Enqueue(ctx context.Context, in <-chan IN) {
+	wgEnqueue := sync.WaitGroup{}
+	wgEnqueue.Go(func() {
 		var indexCounter uint64
 		for v := range in {
 			ws.wgJob.Add(1)
@@ -101,14 +93,14 @@ func (ws *workerStation[IN, OUT]) Pump(ctx context.Context, in <-chan IN) {
 	})
 
 	go func() {
-		wgPump.Wait()
+		wgEnqueue.Wait()
 		ws.wgJob.Wait()
 		close(ws.queue)
 	}()
 }
 
-// enqueueFunc - builds the enqueue func used during retries to send input back into queue.
-func (ws *workerStation[IN, OUT]) enqueueFunc(ctx context.Context, index uint64) func(IN) {
+// buildEnqueueFunc - builds the enqueue func used during retries to send input back into queue.
+func (ws *workerStation[IN, OUT]) buildEnqueueFunc(ctx context.Context, index uint64) func(IN) {
 	return func(v IN) {
 		select {
 		case <-ctx.Done():
@@ -154,7 +146,7 @@ func (ws *workerStation[IN, OUT]) StartWorker(ctx context.Context) {
 		default:
 		}
 		scope := Scope[IN]{
-			enqueue:     ws.enqueueFunc(ctx, jobIn.index),
+			enqueue:     ws.buildEnqueueFunc(ctx, jobIn.index),
 			wgJob:       &ws.wgJob,
 			once:        &sync.Once{},
 			retryClosed: &syncvalue.Value[bool]{},
@@ -205,7 +197,7 @@ func Workers[IN any, OUT any](ctx context.Context, in <-chan IN, handler Handler
 	ws.ordered = make(chan job[OUT], ws.bufferSize)
 	ws.out = make(chan OUT, ws.bufferSize)
 
-	ws.Pump(ctx, in)
+	ws.Enqueue(ctx, in)
 
 	wgWorker := sync.WaitGroup{}
 	for range ws.workerSize {
