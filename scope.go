@@ -10,7 +10,7 @@ import (
 
 // Scope - gives the user some ability to do things that require internal mechanisms.
 type Scope[IN any] struct {
-	enqueue     func(v IN)
+	enqueue     func(IN)
 	willRetry   bool
 	retryClosed *syncvalue.Value[bool]
 	once        *sync.Once
