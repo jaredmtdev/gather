@@ -1,4 +1,4 @@
 TODO:
 
 -set up a performance test that tests against baseline
--set up benchmarks for sharding
+-set up testing for shard package

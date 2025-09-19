@@ -1,4 +1,3 @@
-// shard - experimental package. may or may not release this for public use later
 package shard
 
 import (
@@ -7,7 +6,7 @@ import (
 )
 
 // Workers - wraps around together.Workers by sharding multiple inputs/outputs
-// each shard gets it's own worker pool
+// each shard spawns it's own worker pool
 func Workers[IN, OUT any](
 	ctx context.Context,
 	ins []<-chan IN,
