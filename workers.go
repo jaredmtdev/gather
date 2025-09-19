@@ -195,7 +195,9 @@ func Workers[IN any, OUT any](ctx context.Context, in <-chan IN, handler Handler
 		handler:    handler,
 	}
 	ws.queue = make(chan job[IN], ws.bufferSize)
-	ws.ordered = make(chan job[OUT], ws.bufferSize)
+	if ws.orderPreserved {
+		ws.ordered = make(chan job[OUT], ws.bufferSize)
+	}
 	ws.out = make(chan OUT, ws.bufferSize)
 
 	ws.Enqueue(ctx, in)
@@ -216,8 +218,10 @@ func Workers[IN any, OUT any](ctx context.Context, in <-chan IN, handler Handler
 
 	go func() {
 		wgWorker.Wait()
-		close(ws.ordered)
-		wgOrdered.Wait()
+		if ws.orderPreserved {
+			close(ws.ordered)
+			wgOrdered.Wait()
+		}
 		close(ws.out)
 	}()
 	return ws.out

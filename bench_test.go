@@ -6,14 +6,15 @@ import (
 	"runtime"
 	"testing"
 	"time"
+
 	"together"
 )
 
 /*
-expecting the overhead to be significant in this benchmark since the jobs each have neglible cost
+expecting the overhead to be significant in this benchmark since the jobs each have negligible cost
 go test -bench=BenchmarkWorkersInstantJobs -benchtime=5x
 
-best result: 3 workers and 1500 buffer size
+best result: 3 workers and 1500 buffer size.
 */
 func BenchmarkWorkersInstantJobs(b *testing.B) {
 	maxprocs := runtime.GOMAXPROCS(0)
@@ -38,7 +39,7 @@ func BenchmarkWorkersInstantJobs(b *testing.B) {
 /*
 go test -bench=BenchmarkWorkersWithSimulatedWork -benchtime=10x
 
-best result: 10k workers and 100k buffer
+best result: 10k workers and 100k buffer.
 */
 func BenchmarkWorkersWithSimulatedWork(b *testing.B) {
 	mw := mwRandomDelay[int, int](time.Now().UnixNano(), 0, 20*time.Millisecond)

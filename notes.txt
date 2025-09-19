@@ -2,3 +2,8 @@ TODO:
 
 -set up a performance test that tests against baseline
 -can we provide any mechanism for easy sharding?
+
+
+when splitting work to multiple shards:
+-the number of shards is known ahead of time
+--use slice of channels. worker n receives nth input channel and returns nth output channel
