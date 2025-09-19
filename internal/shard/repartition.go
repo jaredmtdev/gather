@@ -8,28 +8,30 @@ import (
 // Hash - used to determine which shard to send data to
 type Hash[T any] func(inShard int, job int, v T) (outShard int)
 
-// RepartitionBuilder - used to configure a repartition
-type RepartitionBuilder[T any] struct {
+// Repartitioner - used to configure a repartition
+//
+// note:
+// - repartitioning cannot guarantee order
+type Repartitioner[T any] struct {
 	partitions int
 	bufferSize *int
 	h          Hash[T]
 }
 
 // WithBufferSize - option to set new buffer size. by default will choose same buffer as input data
-func (pb *RepartitionBuilder[T]) WithBufferSize(bufferSize int) *RepartitionBuilder[T] {
+func (pb *Repartitioner[T]) WithBufferSize(bufferSize int) *Repartitioner[T] {
 	pb.bufferSize = &bufferSize
 	return pb
 }
 
 // WithHash - option to use a custom hash function to design which partition to send data to
-func (pb *RepartitionBuilder[T]) WithHash(h Hash[T]) *RepartitionBuilder[T] {
+func (pb *Repartitioner[T]) WithHash(h Hash[T]) *Repartitioner[T] {
 	pb.h = h
 	return pb
 }
 
-// Run - runs the repartition to get the new partitions
-// note that repartitioning cannot guarantee order
-func (pb *RepartitionBuilder[T]) Run(ctx context.Context, ins ...<-chan T) []<-chan T {
+// Run - runs the repartition
+func (pb *Repartitioner[T]) Run(ctx context.Context, ins ...<-chan T) []<-chan T {
 	if len(ins) == 0 {
 		panic("must send at least 1 input channel to Repartition")
 	}
@@ -73,11 +75,11 @@ func (pb *RepartitionBuilder[T]) Run(ctx context.Context, ins ...<-chan T) []<-c
 
 // Repartition - configure a repartition
 // used to change N input channels into M output channels
-func Repartition[T any](partitions int) *RepartitionBuilder[T] {
+func Repartition[T any](partitions int) *Repartitioner[T] {
 	defaultHash := func(inShard int, job int, v T) int {
 		return inShard + job
 	}
-	p := &RepartitionBuilder[T]{
+	p := &Repartitioner[T]{
 		partitions: partitions,
 		h:          defaultHash,
 	}
