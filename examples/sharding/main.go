@@ -1,83 +1,64 @@
+/*
+this example shows how the experimental shard package can be used
+*/
 package main
 
 import (
 	"context"
 	"fmt"
 	"together"
-	"together/examples/internal/samplegen"
+	"together/internal/shard"
 )
-
-// wraps around Workers by sharding input out to multiple shards
-// each shard gets it's own worker pool
-func WorkersSharded[IN, OUT any](
-	ctx context.Context,
-	in <-chan IN,
-	mapToShard func(IN) uint,
-	shardSize int,
-	bufferSize int,
-	handler together.HandlerFunc[IN, OUT],
-	workerOpts ...together.Opt,
-) []<-chan OUT {
-	if shardSize < 1 {
-		shardSize = 1
-	}
-	ins := make([]chan IN, shardSize)
-	outs := make([]<-chan OUT, shardSize)
-
-	// start each shard
-	for i := range ins {
-		ins[i] = make(chan IN, bufferSize)
-		outs[i] = together.Workers(ctx, ins[i], handler, workerOpts...)
-	}
-
-	// send to each shard
-	go func() {
-		defer func() {
-			for i := range ins {
-				close(ins[i])
-			}
-		}()
-		for v := range in {
-			shard := int(mapToShard(v) % uint(shardSize))
-			select {
-			case <-ctx.Done():
-				return
-			case ins[shard] <- v:
-			}
-		}
-	}()
-
-	return outs
-}
 
 func main() {
 	jobs := 10_000
-	shardSize := 1000
-	shardBuffer := 100
+	shardSize := 1_000
 
-	workerSizePerShard := 10
+	workerSizePerShard := 100
 	workerBuffer := 100
 
 	workerOpts := []together.Opt{
 		together.WithWorkerSize(workerSizePerShard),
 		together.WithBufferSize(workerBuffer),
-		together.WithOrderPreserved(),
+		//together.WithOrderPreserved(),
 	}
 
 	ctx := context.Background()
-	shardHash := func(v int) uint {
-		return uint(v)
-	}
 	add := func(num int) together.HandlerFunc[int, int] {
 		return func(_ context.Context, in int, _ *together.Scope[int]) (int, error) {
 			return in + num, nil
 		}
 	}
-	shards := WorkersSharded(ctx, samplegen.Range(jobs, shardBuffer), shardHash, shardSize, shardBuffer, add(3), workerOpts...)
 
-	// any order
+	// generators (one for each shard)
+	ins := make([]<-chan int, shardSize)
+	for s := range shardSize {
+		in := make(chan int, workerBuffer)
+		ins[s] = in
+		go func() {
+			defer close(in)
+			for i := range jobs / shardSize {
+				select {
+				case <-ctx.Done():
+					return
+				case in <- s + i*shardSize:
+				}
+			}
+		}()
+	}
+
+	// showing multiple stages of sharded workers
+	outs1 := shard.Workers(ctx, ins, add(3), workerOpts...)
+	outs2 := shard.Workers(ctx, outs1, add(-3), workerOpts...)
+
+	for v := range shard.Repartition[int](1).Run(ctx, outs2...)[0] {
+		fmt.Printf("%v ", v)
+	}
+	fmt.Println("")
+
+	//// any order
 	//wgShard := sync.WaitGroup{}
-	//for i, shard := range shards {
+	//for i, shard := range outs2 {
 	//	wgShard.Go(func() {
 	//		for v := range shard {
 	//			fmt.Printf("shard %v: %v\n", i, v)
@@ -86,18 +67,23 @@ func main() {
 	//}
 	//wgShard.Wait()
 
-	// preserve order via round robin
-	var done bool
-	for !done {
-		for i := range len(shards) {
-			select {
-			case v, ok := <-shards[i]:
-				if !ok {
-					done = true
-					continue
-				}
-				fmt.Printf("shard %v: %v\n", i, v)
-			}
-		}
-	}
+	//	// preserve order via round robin
+	//	var done bool
+	//
+	// loop:
+	//
+	//	for !done {
+	//		for i := range len(outs2) {
+	//			select {
+	//			case <-ctx.Done():
+	//				break loop
+	//			case v, ok := <-outs2[i]:
+	//				if !ok {
+	//					done = true
+	//					break
+	//				}
+	//				fmt.Printf("shard %v: %v\n", i, v)
+	//			}
+	//		}
+	//	}
 }
