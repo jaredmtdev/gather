@@ -1,6 +1,4 @@
-/*
-this example shows how the experimental shard package can be used
-*/
+// this example shows how the experimental shard package can be used
 package main
 
 import (
