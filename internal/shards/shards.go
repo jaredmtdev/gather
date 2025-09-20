@@ -1,13 +1,13 @@
-package shard
+package shards
 
 import (
 	"context"
 	"together"
 )
 
-// Workers - wraps around together.Workers by sharding multiple inputs/outputs
+// Shards - wraps around together.Shards by sharding multiple inputs/outputs
 // each shard spawns it's own worker pool
-func Workers[IN, OUT any](
+func Shards[IN, OUT any](
 	ctx context.Context,
 	ins []<-chan IN,
 	handler together.HandlerFunc[IN, OUT],

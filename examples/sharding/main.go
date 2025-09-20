@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 	"together"
-	"together/internal/shard"
+	"together/internal/shards"
 )
 
 func main() {
@@ -46,10 +46,10 @@ func main() {
 	}
 
 	// showing multiple stages of sharded workers
-	outs1 := shard.Workers(ctx, ins, add(3), workerOpts...)
-	outs2 := shard.Workers(ctx, outs1, add(-3), workerOpts...)
+	outs1 := shards.Shards(ctx, ins, add(3), workerOpts...)
+	outs2 := shards.Shards(ctx, outs1, add(-3), workerOpts...)
 
-	for v := range shard.Repartition[int](1).Run(ctx, outs2...)[0] {
+	for v := range shards.Repartition[int](1).Run(ctx, outs2...)[0] {
 		fmt.Printf("%v ", v)
 	}
 	fmt.Println("")
