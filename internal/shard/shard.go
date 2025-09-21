@@ -5,9 +5,9 @@ import (
 	"gather"
 )
 
-// Shards - wraps around gather.Workers by sharding multiple inputs/outputs
-// each shard spawns it's own worker pool
-func Shards[IN, OUT any](
+// Apply - applies sharding: each shard is a pool of gather.Workers
+// best for large quantity of jobs that have near instant completion time
+func Apply[IN, OUT any](
 	ctx context.Context,
 	ins []<-chan IN,
 	handler gather.HandlerFunc[IN, OUT],

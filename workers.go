@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"gather/pkg/syncvalue"
+	"gather/internal/syncvalue"
 )
 
 // workerOpts - configures behavior of Workers.

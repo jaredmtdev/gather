@@ -1,7 +1,7 @@
 package syncvalue_test
 
 import (
-	"gather/pkg/syncvalue"
+	"gather/internal/syncvalue"
 	"sync"
 	"testing"
 

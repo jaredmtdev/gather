@@ -8,12 +8,14 @@ type Value[T any] struct {
 	value T
 }
 
+// Load - loads current value
 func (l *Value[T]) Load() T {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
 	return l.value
 }
 
+// Store - stores new value
 func (l *Value[T]) Store(v T) {
 	l.mu.Lock()
 	l.value = v

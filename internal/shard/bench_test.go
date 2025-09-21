@@ -51,8 +51,8 @@ func BenchmarkWorkers(b *testing.B) {
 				}
 
 				// showing multiple stages of sharded workers
-				outs1 := shard.Shards(ctx, ins, add(3), workerOpts...)
-				outs2 := shard.Shards(ctx, outs1, add(-3), workerOpts...)
+				outs1 := shard.Apply(ctx, ins, add(3), workerOpts...)
+				outs2 := shard.Apply(ctx, outs1, add(-3), workerOpts...)
 
 				// consume results from all shards
 				wg := sync.WaitGroup{}

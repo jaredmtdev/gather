@@ -2,11 +2,12 @@ package shard
 
 import (
 	"context"
+	"gather/internal/op"
 	"sync"
 )
 
-// PartitionFunc - used to determine which shard to send data to
-type PartitionFunc[T any] func(inShard int, job int, v T) (outShard int)
+// RouteFunc - used to determine which shard to send data to
+type RouteFunc[T any] func(inShard int, job int, v T) (outShard int)
 
 // Repartitioner - used to configure a repartition
 //
@@ -15,7 +16,7 @@ type PartitionFunc[T any] func(inShard int, job int, v T) (outShard int)
 type Repartitioner[T any] struct {
 	partitionSize int
 	bufferSize    *int
-	partition     PartitionFunc[T]
+	route         RouteFunc[T]
 }
 
 // WithBuffer - option to set new buffer size. by default will choose same buffer as input data
@@ -24,9 +25,10 @@ func (r *Repartitioner[T]) WithBuffer(bufferSize int) *Repartitioner[T] {
 	return r
 }
 
-// WithHash - option to use a custom hash function to design which shard to send data to
-func (r *Repartitioner[T]) WithHash(pf PartitionFunc[T]) *Repartitioner[T] {
-	r.partition = pf
+// WithRoute - option to implement which outgoing shard to route to
+// by default: uses round-robin
+func (r *Repartitioner[T]) WithRoute(route RouteFunc[T]) *Repartitioner[T] {
+	r.route = route
 	return r
 }
 
@@ -52,10 +54,7 @@ func (r *Repartitioner[T]) Apply(ctx context.Context, ins ...<-chan T) []<-chan 
 		wgInShard.Go(func() {
 			job := 0
 			for v := range in {
-				outShard := r.partition(inShard, job, v) % r.partitionSize
-				if outShard < 0 {
-					outShard *= -1
-				}
+				outShard := op.PosMod(r.route(inShard, job, v), r.partitionSize)
 				job++
 				select {
 				case <-ctx.Done():
@@ -84,7 +83,7 @@ func Repartition[T any](newPartitionSize int) *Repartitioner[T] {
 	}
 	r := &Repartitioner[T]{
 		partitionSize: newPartitionSize,
-		partition: func(inShard int, job int, _ T) int {
+		route: func(inShard int, job int, _ T) int {
 			// default: round-robin
 			return inShard + job
 		},
