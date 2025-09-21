@@ -1,4 +1,4 @@
-package together_test
+package gather_test
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"together"
+	"gather"
 )
 
 type number interface {
@@ -37,38 +37,38 @@ func gen[T number](ctx context.Context, n T, buffer ...int) <-chan T {
 
 // === handlers ===
 
-func convert[FROM number, TO number]() together.HandlerFunc[FROM, TO] {
-	return func(_ context.Context, in FROM, _ *together.Scope[FROM]) (TO, error) {
+func convert[FROM number, TO number]() gather.HandlerFunc[FROM, TO] {
+	return func(_ context.Context, in FROM, _ *gather.Scope[FROM]) (TO, error) {
 		return TO(in), nil
 	}
 }
 
-func add[T number](num T) together.HandlerFunc[T, T] {
-	return func(_ context.Context, in T, _ *together.Scope[T]) (T, error) {
+func add[T number](num T) gather.HandlerFunc[T, T] {
+	return func(_ context.Context, in T, _ *gather.Scope[T]) (T, error) {
 		return in + num, nil
 	}
 }
-func subtract[T number](num T) together.HandlerFunc[T, T] {
-	return func(_ context.Context, in T, _ *together.Scope[T]) (T, error) {
+func subtract[T number](num T) gather.HandlerFunc[T, T] {
+	return func(_ context.Context, in T, _ *gather.Scope[T]) (T, error) {
 		return in - num, nil
 	}
 }
-func multiply[T number](num T) together.HandlerFunc[T, T] {
-	return func(_ context.Context, in T, _ *together.Scope[T]) (T, error) {
+func multiply[T number](num T) gather.HandlerFunc[T, T] {
+	return func(_ context.Context, in T, _ *gather.Scope[T]) (T, error) {
 		return in * num, nil
 	}
 }
-func divide[T number](num T) together.HandlerFunc[T, T] {
-	return func(_ context.Context, in T, _ *together.Scope[T]) (T, error) {
+func divide[T number](num T) gather.HandlerFunc[T, T] {
+	return func(_ context.Context, in T, _ *gather.Scope[T]) (T, error) {
 		return in / num, nil
 	}
 }
 
 // === middleware ===
 
-func mwDelay[IN, OUT any](d time.Duration) together.Middleware[IN, OUT] {
-	return func(next together.HandlerFunc[IN, OUT]) together.HandlerFunc[IN, OUT] {
-		return func(ctx context.Context, in IN, scope *together.Scope[IN]) (OUT, error) {
+func mwDelay[IN, OUT any](d time.Duration) gather.Middleware[IN, OUT] {
+	return func(next gather.HandlerFunc[IN, OUT]) gather.HandlerFunc[IN, OUT] {
+		return func(ctx context.Context, in IN, scope *gather.Scope[IN]) (OUT, error) {
 			select {
 			case <-ctx.Done():
 				var v OUT
@@ -80,12 +80,12 @@ func mwDelay[IN, OUT any](d time.Duration) together.Middleware[IN, OUT] {
 	}
 }
 
-func mwRandomDelay[IN, OUT any](seed int64, minDuration time.Duration, maxDuration time.Duration) together.Middleware[IN, OUT] {
+func mwRandomDelay[IN, OUT any](seed int64, minDuration time.Duration, maxDuration time.Duration) gather.Middleware[IN, OUT] {
 	pool := &sync.Pool{
 		New: func() any { return rand.New(rand.NewSource(seed)) },
 	}
-	return func(next together.HandlerFunc[IN, OUT]) together.HandlerFunc[IN, OUT] {
-		return func(ctx context.Context, in IN, scope *together.Scope[IN]) (OUT, error) {
+	return func(next gather.HandlerFunc[IN, OUT]) gather.HandlerFunc[IN, OUT] {
+		return func(ctx context.Context, in IN, scope *gather.Scope[IN]) (OUT, error) {
 			r := pool.Get().(*rand.Rand)
 			defer pool.Put(r)
 			randInterval := time.Duration(r.Int63n(int64(maxDuration - minDuration)))
@@ -101,9 +101,9 @@ func mwRandomDelay[IN, OUT any](seed int64, minDuration time.Duration, maxDurati
 	}
 }
 
-func mwCancelOnInput[IN comparable, OUT any](cancelOn IN, cancel context.CancelFunc) together.Middleware[IN, OUT] {
-	return func(next together.HandlerFunc[IN, OUT]) together.HandlerFunc[IN, OUT] {
-		return func(ctx context.Context, in IN, scope *together.Scope[IN]) (OUT, error) {
+func mwCancelOnInput[IN comparable, OUT any](cancelOn IN, cancel context.CancelFunc) gather.Middleware[IN, OUT] {
+	return func(next gather.HandlerFunc[IN, OUT]) gather.HandlerFunc[IN, OUT] {
+		return func(ctx context.Context, in IN, scope *gather.Scope[IN]) (OUT, error) {
 			if in == cancelOn {
 				cancel()
 				var v OUT
@@ -114,10 +114,10 @@ func mwCancelOnInput[IN comparable, OUT any](cancelOn IN, cancel context.CancelF
 	}
 }
 
-func mwCancelOnCount[IN any, OUT any](cancelOn int32, cancel context.CancelFunc) together.Middleware[IN, OUT] {
+func mwCancelOnCount[IN any, OUT any](cancelOn int32, cancel context.CancelFunc) gather.Middleware[IN, OUT] {
 	count := atomic.Int32{}
-	return func(next together.HandlerFunc[IN, OUT]) together.HandlerFunc[IN, OUT] {
-		return func(ctx context.Context, in IN, scope *together.Scope[IN]) (OUT, error) {
+	return func(next gather.HandlerFunc[IN, OUT]) gather.HandlerFunc[IN, OUT] {
+		return func(ctx context.Context, in IN, scope *gather.Scope[IN]) (OUT, error) {
 			if count.Add(1) == cancelOn {
 				cancel()
 				var v OUT

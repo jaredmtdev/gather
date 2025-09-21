@@ -1,4 +1,4 @@
-package together
+package gather
 
 import "context"
 
@@ -13,7 +13,7 @@ type HandlerFunc[IN any, OUT any] func(ctx context.Context, in IN, scope *Scope[
 // Middleware - wraps handlers.
 type Middleware[IN any, OUT any] func(HandlerFunc[IN, OUT]) HandlerFunc[IN, OUT]
 
-// Chain - middleware together in FIFO execution order.
+// Chain - middleware gather in FIFO execution order.
 func Chain[IN any, OUT any](mws ...Middleware[IN, OUT]) Middleware[IN, OUT] {
 	return func(h HandlerFunc[IN, OUT]) HandlerFunc[IN, OUT] {
 		for _, mw := range mws {

@@ -1,9 +1,9 @@
 package syncvalue_test
 
 import (
+	"gather/pkg/syncvalue"
 	"sync"
 	"testing"
-	"together/pkg/syncvalue"
 
 	"github.com/stretchr/testify/assert"
 )

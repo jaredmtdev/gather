@@ -3,15 +3,15 @@ package main
 import (
 	"context"
 	"fmt"
+	"gather"
+	"gather/examples/internal/samplegen"
+	"gather/examples/internal/samplemiddleware"
 	"math/rand"
 	"time"
-	"together"
-	"together/examples/internal/samplegen"
-	"together/examples/internal/samplemiddleware"
 )
 
 func main() {
-	mw := together.Chain(
+	mw := gather.Chain(
 		samplemiddleware.Timeout[int, int](170*time.Millisecond),
 		samplemiddleware.Logger[int, int]("INFO", "ERROR"),
 		samplemiddleware.Counter[int, int](15),
@@ -19,8 +19,8 @@ func main() {
 	)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	addHandler := func(num int) together.HandlerFunc[int, int] {
-		return func(ctx context.Context, in int, scope *together.Scope[int]) (int, error) {
+	addHandler := func(num int) gather.HandlerFunc[int, int] {
+		return func(ctx context.Context, in int, scope *gather.Scope[int]) (int, error) {
 			select {
 			case <-time.After(time.Duration(rand.Intn(200)) * time.Millisecond):
 			case <-ctx.Done():
@@ -47,12 +47,12 @@ func main() {
 		}
 	}
 
-	opts := []together.Opt{
-		together.WithWorkerSize(2),
-		together.WithBufferSize(0),
+	opts := []gather.Opt{
+		gather.WithWorkerSize(2),
+		gather.WithBufferSize(0),
 	}
 
-	for range together.Workers(ctx, samplegen.Range(40), mw(addHandler(3)), opts...) {
+	for range gather.Workers(ctx, samplegen.Range(40), mw(addHandler(3)), opts...) {
 	}
 	fmt.Println("done!")
 	time.Sleep(time.Second)

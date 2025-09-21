@@ -1,4 +1,4 @@
-package together_test
+package gather_test
 
 import (
 	"context"
@@ -8,16 +8,16 @@ import (
 	"testing/synctest"
 	"time"
 
+	"gather"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"together"
 )
 
 func TestScopeRetry(t *testing.T) {
 	ctx := context.Background()
 	totalAttempts := atomic.Int32{}
 
-	handler := together.HandlerFunc[int, int](func(_ context.Context, in int, scope *together.Scope[int]) (int, error) {
+	handler := gather.HandlerFunc[int, int](func(_ context.Context, in int, scope *gather.Scope[int]) (int, error) {
 		totalAttempts.Add(1)
 		if in == 2 || in == 3 {
 			scope.Retry(ctx, in+1)
@@ -27,7 +27,7 @@ func TestScopeRetry(t *testing.T) {
 	})
 
 	var got int
-	for range together.Workers(ctx, gen(ctx, 20), handler, together.WithWorkerSize(5)) {
+	for range gather.Workers(ctx, gen(ctx, 20), handler, gather.WithWorkerSize(5)) {
 		got++
 	}
 	assert.Equal(t, 20, got)
@@ -40,7 +40,7 @@ func TestScopeRetryAfter(t *testing.T) {
 		totalAttempts := atomic.Int32{}
 		delayUntilRetry := 100 * time.Millisecond
 
-		handler := together.HandlerFunc[int, int](func(ctx context.Context, in int, scope *together.Scope[int]) (int, error) {
+		handler := gather.HandlerFunc[int, int](func(ctx context.Context, in int, scope *gather.Scope[int]) (int, error) {
 			totalAttempts.Add(1)
 			if in == 2 || in == 3 {
 				scope.RetryAfter(ctx, in+1, delayUntilRetry)
@@ -51,7 +51,7 @@ func TestScopeRetryAfter(t *testing.T) {
 
 		start := time.Now()
 		var got int
-		for range together.Workers(ctx, gen(ctx, 10), handler, together.WithWorkerSize(10), together.WithBufferSize(10)) {
+		for range gather.Workers(ctx, gen(ctx, 10), handler, gather.WithWorkerSize(10), gather.WithBufferSize(10)) {
 			got++
 		}
 		duration := time.Since(start)
@@ -67,7 +67,7 @@ func TestScopeRetryAfterWhenNoError(t *testing.T) {
 		totalAttempts := atomic.Int32{}
 		delayUntilRetry := 100 * time.Millisecond
 
-		handler := together.HandlerFunc[int, int](func(ctx context.Context, in int, scope *together.Scope[int]) (int, error) {
+		handler := gather.HandlerFunc[int, int](func(ctx context.Context, in int, scope *gather.Scope[int]) (int, error) {
 			totalAttempts.Add(1)
 			if in == 2 || in == 3 {
 				scope.RetryAfter(ctx, in+1, delayUntilRetry)
@@ -78,7 +78,7 @@ func TestScopeRetryAfterWhenNoError(t *testing.T) {
 
 		start := time.Now()
 		var got int
-		for range together.Workers(ctx, gen(ctx, 10), handler, together.WithWorkerSize(10), together.WithBufferSize(10)) {
+		for range gather.Workers(ctx, gen(ctx, 10), handler, gather.WithWorkerSize(10), gather.WithBufferSize(10)) {
 			got++
 		}
 		duration := time.Since(start)
@@ -94,7 +94,7 @@ func TestScopeRetryAfterOnLastItem(t *testing.T) {
 		totalAttempts := atomic.Int32{}
 		delayUntilRetry := 100 * time.Millisecond
 
-		handler := together.HandlerFunc[int, int](func(ctx context.Context, in int, scope *together.Scope[int]) (int, error) {
+		handler := gather.HandlerFunc[int, int](func(ctx context.Context, in int, scope *gather.Scope[int]) (int, error) {
 			totalAttempts.Add(1)
 			if in == 9 {
 				scope.RetryAfter(ctx, in+1, delayUntilRetry)
@@ -105,7 +105,7 @@ func TestScopeRetryAfterOnLastItem(t *testing.T) {
 
 		start := time.Now()
 		var got int
-		for range together.Workers(ctx, gen(ctx, 10), handler, together.WithWorkerSize(2), together.WithBufferSize(1)) {
+		for range gather.Workers(ctx, gen(ctx, 10), handler, gather.WithWorkerSize(2), gather.WithBufferSize(1)) {
 			got++
 		}
 		duration := time.Since(start)
@@ -119,7 +119,7 @@ func TestScopeWithMultipleRetries(t *testing.T) {
 	ctx := context.Background()
 	totalAttempts := atomic.Int32{}
 
-	handler := together.HandlerFunc[int, int](func(ctx context.Context, in int, scope *together.Scope[int]) (int, error) {
+	handler := gather.HandlerFunc[int, int](func(ctx context.Context, in int, scope *gather.Scope[int]) (int, error) {
 		totalAttempts.Add(1)
 		if in == 2 || in == 3 {
 			scope.Retry(ctx, in+1)
@@ -131,7 +131,7 @@ func TestScopeWithMultipleRetries(t *testing.T) {
 	})
 
 	var got int
-	for range together.Workers(ctx, gen(ctx, 20), handler, together.WithWorkerSize(5)) {
+	for range gather.Workers(ctx, gen(ctx, 20), handler, gather.WithWorkerSize(5)) {
 		got++
 	}
 	assert.Equal(t, 20, got)
@@ -142,7 +142,7 @@ func TestScopeWithMultipleRetries(t *testing.T) {
 func TestScopeGo(t *testing.T) {
 	ctx := context.Background()
 	counter := atomic.Int32{}
-	handler := together.HandlerFunc[int, int](func(_ context.Context, in int, scope *together.Scope[int]) (int, error) {
+	handler := gather.HandlerFunc[int, int](func(_ context.Context, in int, scope *gather.Scope[int]) (int, error) {
 		if in == 2 || in == 3 {
 			scope.Go(
 				func() {
@@ -154,7 +154,7 @@ func TestScopeGo(t *testing.T) {
 	})
 
 	var got int
-	for range together.Workers(ctx, gen(ctx, 20), handler, together.WithWorkerSize(5)) {
+	for range gather.Workers(ctx, gen(ctx, 20), handler, gather.WithWorkerSize(5)) {
 		got++
 	}
 	assert.Equal(t, 20, got)
@@ -164,7 +164,7 @@ func TestScopeGo(t *testing.T) {
 func TestScopeGoNested(t *testing.T) {
 	ctx := context.Background()
 	counter := atomic.Int32{}
-	handler := together.HandlerFunc[int, int](func(_ context.Context, in int, scope *together.Scope[int]) (int, error) {
+	handler := gather.HandlerFunc[int, int](func(_ context.Context, in int, scope *gather.Scope[int]) (int, error) {
 		if in == 2 || in == 3 {
 			scope.Go(
 				func() {
@@ -179,7 +179,7 @@ func TestScopeGoNested(t *testing.T) {
 	})
 
 	var got int
-	for range together.Workers(ctx, gen(ctx, 20), handler, together.WithWorkerSize(5)) {
+	for range gather.Workers(ctx, gen(ctx, 20), handler, gather.WithWorkerSize(5)) {
 		got++
 	}
 	assert.Equal(t, 20, got)
@@ -189,7 +189,7 @@ func TestScopeGoNested(t *testing.T) {
 func TestScopeMultipleGo(t *testing.T) {
 	ctx := context.Background()
 	counter := atomic.Int32{}
-	handler := together.HandlerFunc[int, int](func(_ context.Context, in int, scope *together.Scope[int]) (int, error) {
+	handler := gather.HandlerFunc[int, int](func(_ context.Context, in int, scope *gather.Scope[int]) (int, error) {
 		if in == 2 || in == 3 {
 			for range 3 {
 				scope.Go(
@@ -203,7 +203,7 @@ func TestScopeMultipleGo(t *testing.T) {
 	})
 
 	var got int
-	for range together.Workers(ctx, gen(ctx, 20), handler, together.WithWorkerSize(5)) {
+	for range gather.Workers(ctx, gen(ctx, 20), handler, gather.WithWorkerSize(5)) {
 		got++
 	}
 	assert.Equal(t, 20, got)
@@ -214,7 +214,7 @@ func TestScopeGoWithRetry(t *testing.T) {
 	ctx := context.Background()
 	panicCh := make(chan any, 20)
 
-	handler := together.HandlerFunc[int, int](func(ctx context.Context, in int, scope *together.Scope[int]) (int, error) {
+	handler := gather.HandlerFunc[int, int](func(ctx context.Context, in int, scope *gather.Scope[int]) (int, error) {
 		if in == 2 || in == 3 {
 			scope.Go(
 				func() {
@@ -231,7 +231,7 @@ func TestScopeGoWithRetry(t *testing.T) {
 		return in * 2, nil
 	})
 
-	for range together.Workers(ctx, gen(ctx, 20), handler, together.WithWorkerSize(5)) {
+	for range gather.Workers(ctx, gen(ctx, 20), handler, gather.WithWorkerSize(5)) {
 	}
 
 	close(panicCh)
@@ -248,7 +248,7 @@ func TestScopeGoThenRetry(t *testing.T) {
 	counter := atomic.Int32{}
 	panicCh := make(chan any, 20)
 
-	handler := together.HandlerFunc[int, int](func(ctx context.Context, in int, scope *together.Scope[int]) (int, error) {
+	handler := gather.HandlerFunc[int, int](func(ctx context.Context, in int, scope *gather.Scope[int]) (int, error) {
 		defer func() {
 			if r := recover(); r != nil {
 				panicCh <- r
@@ -266,7 +266,7 @@ func TestScopeGoThenRetry(t *testing.T) {
 		return in * 2, nil
 	})
 
-	for range together.Workers(ctx, gen(ctx, 20), handler, together.WithWorkerSize(5)) {
+	for range gather.Workers(ctx, gen(ctx, 20), handler, gather.WithWorkerSize(5)) {
 	}
 	close(panicCh)
 	var actualPanics int
@@ -283,7 +283,7 @@ func TestScopeRetryThenGo(t *testing.T) {
 	totalAttempts := atomic.Int32{}
 	counter := atomic.Int32{}
 
-	handler := together.HandlerFunc[int, int](func(ctx context.Context, in int, scope *together.Scope[int]) (int, error) {
+	handler := gather.HandlerFunc[int, int](func(ctx context.Context, in int, scope *gather.Scope[int]) (int, error) {
 		totalAttempts.Add(1)
 		if in == 2 || in == 3 {
 			scope.Retry(ctx, in+1)
@@ -296,7 +296,7 @@ func TestScopeRetryThenGo(t *testing.T) {
 	})
 
 	var got int
-	for range together.Workers(ctx, gen(ctx, 20), handler, together.WithWorkerSize(5)) {
+	for range gather.Workers(ctx, gen(ctx, 20), handler, gather.WithWorkerSize(5)) {
 		got++
 	}
 	assert.Equal(t, 20, got)
@@ -310,15 +310,15 @@ func TestOrderedWorkersAndScopeRetryThenGo(t *testing.T) {
 		totalAttempts := atomic.Int32{}
 		counter := atomic.Int32{}
 
-		opts := []together.Opt{
-			together.WithWorkerSize(5),
-			together.WithBufferSize(3),
-			together.WithOrderPreserved(),
+		opts := []gather.Opt{
+			gather.WithWorkerSize(5),
+			gather.WithBufferSize(3),
+			gather.WithOrderPreserved(),
 		}
 
 		mw := mwRandomDelay[int, int](time.Now().UnixNano(), 0, time.Second)
 
-		handler := together.HandlerFunc[int, int](func(ctx context.Context, in int, scope *together.Scope[int]) (int, error) {
+		handler := gather.HandlerFunc[int, int](func(ctx context.Context, in int, scope *gather.Scope[int]) (int, error) {
 			totalAttempts.Add(1)
 			if in == 2 || in == 3 {
 				scope.Retry(ctx, in+1)
@@ -331,7 +331,7 @@ func TestOrderedWorkersAndScopeRetryThenGo(t *testing.T) {
 		})
 
 		var got int
-		for v := range together.Workers(ctx, gen(ctx, 1000), mw(handler), opts...) {
+		for v := range gather.Workers(ctx, gen(ctx, 1000), mw(handler), opts...) {
 			if got != 2 && got != 3 {
 				require.Equal(t, got*2, v)
 			}

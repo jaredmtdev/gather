@@ -1,11 +1,11 @@
-package together
+package gather
 
 import (
 	"context"
 	"sync"
 	"time"
 
-	"together/pkg/syncvalue"
+	"gather/pkg/syncvalue"
 )
 
 // Scope - gives the user some ability to do things that require internal mechanisms.

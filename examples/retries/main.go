@@ -3,10 +3,10 @@ package main
 import (
 	"context"
 	"errors"
+	"gather"
+	"gather/examples/internal/samplemiddleware"
 	"math/rand"
 	"time"
-	"together"
-	"together/examples/internal/samplemiddleware"
 )
 
 type Job struct {
@@ -24,8 +24,8 @@ func shouldRetryUntilMax(maxRetries int) func(Job) (Job, bool) {
 	}
 }
 
-func tripple() together.HandlerFunc[Job, int] {
-	return func(ctx context.Context, job Job, scope *together.Scope[Job]) (int, error) {
+func tripple() gather.HandlerFunc[Job, int] {
+	return func(ctx context.Context, job Job, scope *gather.Scope[Job]) (int, error) {
 		// simulate work
 		select {
 		case <-ctx.Done():
@@ -42,7 +42,7 @@ func tripple() together.HandlerFunc[Job, int] {
 }
 
 func main() {
-	mw := together.Chain(
+	mw := gather.Chain(
 		samplemiddleware.RetryAfter[Job, int](200*time.Millisecond, shouldRetryUntilMax(3)),
 		samplemiddleware.Logger[Job, int]("INFO", "ERROR"),
 	)
@@ -54,6 +54,6 @@ func main() {
 		}
 		close(in)
 	}()
-	for range together.Workers(context.Background(), in, mw(tripple()), together.WithWorkerSize(4)) {
+	for range gather.Workers(context.Background(), in, mw(tripple()), gather.WithWorkerSize(4)) {
 	}
 }
