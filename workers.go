@@ -1,11 +1,11 @@
-package together
+package gather
 
 import (
 	"context"
 	"fmt"
 	"sync"
 
-	"together/pkg/syncvalue"
+	"gather/pkg/syncvalue"
 )
 
 // workerOpts - configures behavior of Workers.

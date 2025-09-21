@@ -7,17 +7,17 @@ package main
 import (
 	"context"
 	"fmt"
+	"gather"
+	"gather/examples/internal/samplegen"
 	"math/rand"
 	"sync"
 	"time"
-	"together"
-	"together/examples/internal/samplegen"
 )
 
 func main() {
 	errCh := make(chan error)
-	addHandler := func(num int) together.HandlerFunc[int, int] {
-		return func(ctx context.Context, in int, scope *together.Scope[int]) (int, error) {
+	addHandler := func(num int) gather.HandlerFunc[int, int] {
+		return func(ctx context.Context, in int, scope *gather.Scope[int]) (int, error) {
 			select {
 			case <-time.After(time.Duration(rand.Intn(200)) * time.Millisecond):
 			case <-ctx.Done():
@@ -46,9 +46,9 @@ func main() {
 	})
 
 	// three stage pipeline
-	out1 := together.Workers(ctx, samplegen.Range(40), addHandler(1), together.WithWorkerSize(5))
-	out2 := together.Workers(ctx, out1, addHandler(2), together.WithWorkerSize(3))
-	for v := range together.Workers(ctx, out2, addHandler(3), together.WithWorkerSize(2), together.WithBufferSize(2)) {
+	out1 := gather.Workers(ctx, samplegen.Range(40), addHandler(1), gather.WithWorkerSize(5))
+	out2 := gather.Workers(ctx, out1, addHandler(2), gather.WithWorkerSize(3))
+	for v := range gather.Workers(ctx, out2, addHandler(3), gather.WithWorkerSize(2), gather.WithBufferSize(2)) {
 		fmt.Printf("%v ", v)
 	}
 	close(errCh)

@@ -1,2 +1,2 @@
-// Package together - lightweight package that glues together all concurrency patterns.
-package together
+// Package gather - lightweight package that glues gather all concurrency patterns.
+package gather

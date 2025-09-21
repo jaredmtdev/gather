@@ -1,4 +1,4 @@
-module together
+module gather
 
 go 1.25.0
 

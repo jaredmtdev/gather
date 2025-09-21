@@ -3,17 +3,17 @@ package main
 import (
 	"context"
 	"fmt"
+	"gather"
+	"gather/examples/internal/samplegen"
+	"gather/examples/internal/samplemiddleware"
 	"math/rand"
 	"time"
-	"together"
-	"together/examples/internal/samplegen"
-	"together/examples/internal/samplemiddleware"
 )
 
 func main() {
 	mw := samplemiddleware.Logger[int, int]("INFO", "ERROR")
-	addHandler := func(num int) together.HandlerFunc[int, int] {
-		return func(ctx context.Context, in int, scope *together.Scope[int]) (int, error) {
+	addHandler := func(num int) gather.HandlerFunc[int, int] {
+		return func(ctx context.Context, in int, scope *gather.Scope[int]) (int, error) {
 			select {
 			case <-time.After(time.Duration(rand.Intn(200)) * time.Millisecond):
 			case <-ctx.Done():
@@ -22,15 +22,15 @@ func main() {
 			return num + in, nil
 		}
 	}
-	wrappedAddHandler := func(num int) together.HandlerFunc[int, int] {
+	wrappedAddHandler := func(num int) gather.HandlerFunc[int, int] {
 		return mw(addHandler(num))
 	}
 	ctx := context.Background()
 
 	// example of a pipeline
-	out1 := together.Workers(ctx, samplegen.Range(40), wrappedAddHandler(1), together.WithWorkerSize(5))
-	out2 := together.Workers(ctx, out1, wrappedAddHandler(2), together.WithWorkerSize(3))
-	for range together.Workers(ctx, out2, wrappedAddHandler(3), together.WithWorkerSize(2), together.WithBufferSize(2)) {
+	out1 := gather.Workers(ctx, samplegen.Range(40), wrappedAddHandler(1), gather.WithWorkerSize(5))
+	out2 := gather.Workers(ctx, out1, wrappedAddHandler(2), gather.WithWorkerSize(3))
+	for range gather.Workers(ctx, out2, wrappedAddHandler(3), gather.WithWorkerSize(2), gather.WithBufferSize(2)) {
 	}
 
 	// should not see anymore noise from the pipeline at this point

@@ -4,8 +4,8 @@ package main
 import (
 	"context"
 	"fmt"
-	"together"
-	"together/internal/shards"
+	"gather"
+	"gather/internal/shard"
 )
 
 func main() {
@@ -15,15 +15,15 @@ func main() {
 	workerSizePerShard := 100
 	workerBuffer := 100
 
-	workerOpts := []together.Opt{
-		together.WithWorkerSize(workerSizePerShard),
-		together.WithBufferSize(workerBuffer),
-		//together.WithOrderPreserved(),
+	workerOpts := []gather.Opt{
+		gather.WithWorkerSize(workerSizePerShard),
+		gather.WithBufferSize(workerBuffer),
+		//gather.WithOrderPreserved(),
 	}
 
 	ctx := context.Background()
-	add := func(num int) together.HandlerFunc[int, int] {
-		return func(_ context.Context, in int, _ *together.Scope[int]) (int, error) {
+	add := func(num int) gather.HandlerFunc[int, int] {
+		return func(_ context.Context, in int, _ *gather.Scope[int]) (int, error) {
 			return in + num, nil
 		}
 	}
@@ -46,10 +46,10 @@ func main() {
 	}
 
 	// showing multiple stages of sharded workers
-	outs1 := shards.Shards(ctx, ins, add(3), workerOpts...)
-	outs2 := shards.Shards(ctx, outs1, add(-3), workerOpts...)
+	outs1 := shard.Shards(ctx, ins, add(3), workerOpts...)
+	outs2 := shard.Shards(ctx, outs1, add(-3), workerOpts...)
 
-	for v := range shards.Repartition[int](1).Run(ctx, outs2...)[0] {
+	for v := range shard.Repartition[int](1).Apply(ctx, outs2...)[0] {
 		fmt.Printf("%v ", v)
 	}
 	fmt.Println("")

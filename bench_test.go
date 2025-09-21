@@ -1,4 +1,4 @@
-package together_test
+package gather_test
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"together"
+	"gather"
 )
 
 /*
@@ -24,11 +24,11 @@ func BenchmarkWorkersInstantJobs(b *testing.B) {
 			b.Run(fmt.Sprintf("workers: %v, buffer: %1.1e ", float64(workerSize), float64(bufferSize)), func(b *testing.B) {
 				for b.Loop() {
 					ctx := context.Background()
-					opts := []together.Opt{
-						together.WithWorkerSize(workerSize),
-						together.WithBufferSize(bufferSize),
+					opts := []gather.Opt{
+						gather.WithWorkerSize(workerSize),
+						gather.WithBufferSize(bufferSize),
 					}
-					for range together.Workers(ctx, gen(ctx, 10_000_000, bufferSize), add(5), opts...) {
+					for range gather.Workers(ctx, gen(ctx, 10_000_000, bufferSize), add(5), opts...) {
 					}
 				}
 			})
@@ -50,11 +50,11 @@ func BenchmarkWorkersWithSimulatedWork(b *testing.B) {
 			b.Run(fmt.Sprintf("workers: %1.0e, buffer: %1.1e ", float64(workerSize), float64(bufferSize)), func(b *testing.B) {
 				for b.Loop() {
 					ctx := context.Background()
-					opts := []together.Opt{
-						together.WithWorkerSize(workerSize),
-						together.WithBufferSize(bufferSize),
+					opts := []gather.Opt{
+						gather.WithWorkerSize(workerSize),
+						gather.WithBufferSize(bufferSize),
 					}
-					for range together.Workers(ctx, gen(ctx, 10_000, bufferSize), mw(add(5)), opts...) {
+					for range gather.Workers(ctx, gen(ctx, 10_000, bufferSize), mw(add(5)), opts...) {
 					}
 				}
 			})

@@ -1,12 +1,12 @@
-package shards_test
+package shard_test
 
 import (
 	"context"
 	"fmt"
+	"gather"
+	"gather/internal/shard"
 	"sync"
 	"testing"
-	"together"
-	"together/internal/shards"
 )
 
 // go test -bench=BenchmarkWorkers ./internal/shard -benchtime=5x
@@ -14,8 +14,8 @@ import (
 func BenchmarkWorkers(b *testing.B) {
 	workerBuffer := 100
 	jobs := 1_000_000
-	add := func(num int) together.HandlerFunc[int, int] {
-		return func(_ context.Context, in int, _ *together.Scope[int]) (int, error) {
+	add := func(num int) gather.HandlerFunc[int, int] {
+		return func(_ context.Context, in int, _ *gather.Scope[int]) (int, error) {
 			return in + num, nil
 		}
 	}
@@ -26,9 +26,9 @@ func BenchmarkWorkers(b *testing.B) {
 		workerSizePerShard := 100_000 / shardSize
 		b.Run(fmt.Sprintf("shards: %1.0e, workersPerShard: %1.e", float64(shardSize), float64(workerSizePerShard)), func(b *testing.B) {
 			for b.Loop() {
-				workerOpts := []together.Opt{
-					together.WithWorkerSize(workerSizePerShard),
-					together.WithBufferSize(workerBuffer),
+				workerOpts := []gather.Opt{
+					gather.WithWorkerSize(workerSizePerShard),
+					gather.WithBufferSize(workerBuffer),
 				}
 
 				ctx := context.Background()
@@ -51,8 +51,8 @@ func BenchmarkWorkers(b *testing.B) {
 				}
 
 				// showing multiple stages of sharded workers
-				outs1 := shards.Shards(ctx, ins, add(3), workerOpts...)
-				outs2 := shards.Shards(ctx, outs1, add(-3), workerOpts...)
+				outs1 := shard.Shards(ctx, ins, add(3), workerOpts...)
+				outs2 := shard.Shards(ctx, outs1, add(-3), workerOpts...)
 
 				// consume results from all shards
 				wg := sync.WaitGroup{}
