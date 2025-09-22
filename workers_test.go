@@ -2,6 +2,7 @@ package gather_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"sync"
@@ -82,6 +83,43 @@ func TestWorkersSynchronousOrderedWithEarlyCancel(t *testing.T) {
 		got++
 	}
 	assert.Less(t, got, 3+5)
+}
+
+func TestWorkersSynchronousWithInstantCancel(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var got int
+	cancel()
+	for v := range gather.Workers(ctx, gen(ctx, 20), add(3)) {
+		require.Equal(t, got+3, v)
+		got++
+	}
+	assert.Equal(t, 0, got)
+}
+
+func TestWorkersSynchronousOrderedWithSomeErrors(t *testing.T) {
+	ctx := context.Background()
+
+	handler := func() gather.HandlerFunc[int, int] {
+		return func(_ context.Context, in int, _ *gather.Scope[int]) (int, error) {
+			if in == 2 || in == 3 {
+				return 0, errors.New("bad value")
+			}
+			return in, nil
+		}
+	}
+
+	var got int
+	for v := range gather.Workers(ctx, gen(ctx, 20), handler(), gather.WithOrderPreserved()) {
+		if v > 2 {
+			require.Equal(t, got+2, v)
+		} else {
+			require.Equal(t, got, v)
+		}
+		got++
+	}
+	assert.Equal(t, 18, got)
 }
 
 func TestPipelineSynchronous(t *testing.T) {

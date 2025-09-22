@@ -2,8 +2,6 @@
 # automatically displays the available commands.
 .DEFAULT_GOAL := help
 
-SHELL := /bin/zsh
-
 .PHONY: help
 help: ## Show this help message.
 	@echo "Available commands:"
@@ -12,7 +10,7 @@ help: ## Show this help message.
 
 .PHONY: test
 test: ## Run unit tests.
-	go test -race -coverprofile=coverage.out $(go list ./... | grep -v "examples")
+	go test -race -coverprofile=coverage.out `go list ./... | grep -v 'examples'`
 
 .PHONY: lint
 lint: ## show linting issues.
