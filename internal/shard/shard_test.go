@@ -4,7 +4,6 @@ import (
 	"context"
 	"gather"
 	"gather/internal/shard"
-	"gather/internal/syncvalue"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -95,16 +94,16 @@ func TestApplyWithMultipleWorkersAndNoBuffer(t *testing.T) {
 	wgGen.Wait()
 	outs := shard.Apply(ctx, ins, handler(), gather.WithBufferSize(0), gather.WithWorkerSize(2))
 	assert.Len(t, outs, 5)
-	var total syncvalue.Value[int]
+	var total atomic.Int32
 	wg := sync.WaitGroup{}
 	for _, out := range outs {
 		wg.Go(func() {
 			for v := range out {
 				assert.Equal(t, 1, v)
-				total.Store(total.Load() + v)
+				total.Add(1)
 			}
 		})
 	}
 	wg.Wait()
-	assert.Equal(t, 5, total.Load())
+	assert.Equal(t, int32(5), total.Load())
 }
