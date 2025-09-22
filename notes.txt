@@ -5,5 +5,5 @@ TODO:
 -is there a way to preserve order during repartition?
 
 TODO:
--set up tests
+-set up more tests
 -think of way to preserve order during repartition
