@@ -1,13 +1,13 @@
-# together
+# Gather
 
-Together is a lightweight channel-based concurrency library for Go.
+Gather is a lightweight channel-based concurrency library for Go.
 It helps you build **worker pools, pipelines, and middleware**.
 
 ## Quick Example
 
 ## Install
 
-`go get github.com/???/together`
+`go get github.com/???/Gather`
 
 ## API at a glance
 
@@ -19,16 +19,16 @@ It helps you build **worker pools, pipelines, and middleware**.
 
 ## Design Philosophy
 
-Together provides the glue: the tools for workers, pipelines, and middleware.  
+Gather provides the glue: the tools for workers, pipelines, and middleware.  
 You design the concurrency patterns that fit your use case.
 
-Together is simple because it:
+Gather is simple because it:
 
 - enables developers to build almost any concurrency model
 - provides familiar middleware mechanisms (like "net/http")
 - decouples middleware logic from business logic for easier testing and debugging
 
-Together is flexible because it:
+Gather is flexible because it:
 
 - leaves retry and error handling decisions to you
 - lets you manage input/ouput channels directly
