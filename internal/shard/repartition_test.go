@@ -160,3 +160,20 @@ func TestRepartitionWithRoute(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+func TestRepartitionWithNoInputShards(t *testing.T) {
+	ctx := context.Background()
+	panicCh := make(chan any, 1)
+	wg := sync.WaitGroup{}
+	wg.Go(func() {
+		defer func() {
+			if r := recover(); r != nil {
+				panicCh <- r
+				close(panicCh)
+			}
+		}()
+		shard.Repartition[int](10).Apply(ctx)
+	})
+	wg.Wait()
+	assert.Contains(t, <-panicCh, "must send at least 1 input channel")
+}

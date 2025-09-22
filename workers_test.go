@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"gather"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -37,13 +36,14 @@ func TestWorkersSynchronousNilChan(t *testing.T) {
 
 func TestWorkersSynchronousNilChanWithPanicOnNil(t *testing.T) {
 	ctx := context.Background()
-	panicChan := make(chan any, 1)
+	panicCh := make(chan any, 1)
 	var got int
 	wg := sync.WaitGroup{}
 	wg.Go(func() {
 		defer func() {
 			if r := recover(); r != nil {
-				panicChan <- r
+				panicCh <- r
+				close(panicCh)
 			}
 		}()
 		for range gather.Workers(ctx, nil, add(3), gather.WithPanicOnNilChannel()) {
@@ -52,7 +52,7 @@ func TestWorkersSynchronousNilChanWithPanicOnNil(t *testing.T) {
 	})
 	wg.Wait()
 	assert.Equal(t, 0, got)
-	assert.Contains(t, <-panicChan, "nil input channel")
+	assert.Contains(t, <-panicCh, "nil input channel")
 }
 
 func TestWorkersSynchronousOrdered(t *testing.T) {
@@ -368,6 +368,7 @@ func TestWorkersInvalidBuffer(t *testing.T) {
 		defer func() {
 			if r := recover(); r != nil {
 				panicCh <- r
+				close(panicCh)
 			}
 		}()
 		for v := range gather.Workers(ctx, gen(ctx, 200), add(3), gather.WithBufferSize(-1)) {
@@ -389,6 +390,7 @@ func TestWorkersInvalidWorkerSize(t *testing.T) {
 		defer func() {
 			if r := recover(); r != nil {
 				panicCh <- r
+				close(panicCh)
 			}
 		}()
 		for v := range gather.Workers(ctx, gen(ctx, 200), add(3), gather.WithWorkerSize(0)) {
