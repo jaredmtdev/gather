@@ -1,1 +1,3 @@
 examples/matrixmultiply/
+coverage.out
+coverage.html
