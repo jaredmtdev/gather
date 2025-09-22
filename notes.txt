@@ -1,6 +1,5 @@
 TODO:
 
--set up a performance test that tests against baseline
 -set up testing for shard package
 -is there a way to preserve order during repartition?
 

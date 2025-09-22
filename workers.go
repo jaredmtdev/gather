@@ -13,6 +13,7 @@ type workerOpts struct {
 	workerSize     int
 	bufferSize     int
 	orderPreserved bool
+	panicOnNil     bool
 }
 
 // Opt - options used to configure Workers.
@@ -43,6 +44,14 @@ func WithBufferSize(bufferSize int) Opt {
 func WithOrderPreserved() Opt {
 	return func(w *workerOpts) {
 		w.orderPreserved = true
+	}
+}
+
+// WithPanicOnNilChannel - option to panic when a nil channel is sent to Workers
+// by default, Workers will immediately close the out channel and return.
+func WithPanicOnNilChannel() Opt {
+	return func(w *workerOpts) {
+		w.panicOnNil = true
 	}
 }
 
@@ -199,6 +208,14 @@ func Workers[IN any, OUT any](ctx context.Context, in <-chan IN, handler Handler
 		ws.ordered = make(chan job[OUT], ws.bufferSize)
 	}
 	ws.out = make(chan OUT, ws.bufferSize)
+
+	if in == nil {
+		if ws.panicOnNil {
+			panic("gather.Workers: nil input channel")
+		}
+		close(ws.out)
+		return ws.out
+	}
 
 	ws.Enqueue(ctx, in)
 

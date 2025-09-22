@@ -74,12 +74,16 @@ func TestMultipleRepartitions(t *testing.T) {
 
 	outs1 := shard.Repartition[int](10).Apply(ctx, in)
 	assert.Len(t, outs1, 10)
+	assert.Equal(t, 1, cap(outs1[0]))
 	outs2 := shard.Repartition[int](5).Apply(ctx, outs1...)
 	assert.Len(t, outs2, 5)
+	assert.Equal(t, 1, cap(outs2[0]))
 	outs3 := shard.Repartition[int](20).Apply(ctx, outs2...)
 	assert.Len(t, outs3, 20)
+	assert.Equal(t, 1, cap(outs3[0]))
 	outs4 := shard.Repartition[int](1).Apply(ctx, outs3...)
 	require.Len(t, outs4, 1)
+	assert.Equal(t, 1, cap(outs4[0]))
 	seen := make([]bool, 1000)
 	for v := range outs4[0] {
 		assert.False(t, seen[v])

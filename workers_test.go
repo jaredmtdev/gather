@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -21,6 +22,35 @@ func TestWorkersSynchronous(t *testing.T) {
 		got++
 	}
 	assert.Equal(t, 200, got)
+}
+
+func TestWorkersSynchronousNilChan(t *testing.T) {
+	ctx := context.Background()
+	var got int
+	for range gather.Workers(ctx, nil, add(3)) {
+		got++
+	}
+	assert.Equal(t, 0, got)
+}
+
+func TestWorkersSynchronousNilChanWithPanicOnNil(t *testing.T) {
+	ctx := context.Background()
+	panicChan := make(chan any, 1)
+	var got int
+	wg := sync.WaitGroup{}
+	wg.Go(func() {
+		defer func() {
+			if r := recover(); r != nil {
+				panicChan <- r
+			}
+		}()
+		for range gather.Workers(ctx, nil, add(3), gather.WithPanicOnNilChannel()) {
+			got++
+		}
+	})
+	wg.Wait()
+	assert.Equal(t, 0, got)
+	assert.Contains(t, <-panicChan, "nil input channel")
 }
 
 func TestWorkersSynchronousOrdered(t *testing.T) {
