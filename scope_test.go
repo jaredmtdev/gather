@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"gather"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -341,4 +342,27 @@ func TestOrderedWorkersAndScopeRetryThenGo(t *testing.T) {
 		assert.Equal(t, int32(3), counter.Load())
 		assert.Equal(t, int32(1003), totalAttempts.Load())
 	})
+}
+
+func TestScopeRetryDuringCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	totalAttempts := atomic.Int32{}
+
+	handler := gather.HandlerFunc[int, int](func(_ context.Context, in int, scope *gather.Scope[int]) (int, error) {
+		totalAttempts.Add(1)
+		if in == 2 || in == 3 {
+			cancel()
+			scope.Retry(ctx, in+1)
+			return 0, errors.New("invalid number")
+		}
+		return in * 2, nil
+	})
+
+	var got int
+	for range gather.Workers(ctx, gen(ctx, 20), handler, gather.WithWorkerSize(2)) {
+		got++
+	}
+	assert.LessOrEqual(t, got, 2)
+	assert.LessOrEqual(t, int32(2), totalAttempts.Load())
 }

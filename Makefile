@@ -2,6 +2,8 @@
 # automatically displays the available commands.
 .DEFAULT_GOAL := help
 
+SHELL := /bin/zsh
+
 .PHONY: help
 help: ## Show this help message.
 	@echo "Available commands:"
