@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"gather"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -318,4 +319,46 @@ func TestPipelineOrderedWithEarlyCancelAtFirstStage(t *testing.T) {
 		}
 		assert.Less(t, got, 5)
 	})
+}
+
+func TestWorkersInvalidBuffer(t *testing.T) {
+	panicCh := make(chan any, 1)
+	ctx := context.Background()
+	var got int
+	wg := sync.WaitGroup{}
+	wg.Go(func() {
+		defer func() {
+			if r := recover(); r != nil {
+				panicCh <- r
+			}
+		}()
+		for v := range gather.Workers(ctx, gen(ctx, 200), add(3), gather.WithBufferSize(-1)) {
+			require.Equal(t, got+3, v)
+			got++
+		}
+	})
+	wg.Wait()
+	assert.Equal(t, 0, got)
+	assert.Contains(t, <-panicCh, "buffer must be at least 0")
+}
+
+func TestWorkersInvalidWorkerSize(t *testing.T) {
+	panicCh := make(chan any, 1)
+	ctx := context.Background()
+	var got int
+	wg := sync.WaitGroup{}
+	wg.Go(func() {
+		defer func() {
+			if r := recover(); r != nil {
+				panicCh <- r
+			}
+		}()
+		for v := range gather.Workers(ctx, gen(ctx, 200), add(3), gather.WithWorkerSize(0)) {
+			require.Equal(t, got+3, v)
+			got++
+		}
+	})
+	wg.Wait()
+	assert.Equal(t, 0, got)
+	assert.Contains(t, <-panicCh, "must use at least 1 worker")
 }
