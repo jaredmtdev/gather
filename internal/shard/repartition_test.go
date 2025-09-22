@@ -92,3 +92,71 @@ func TestMultipleRepartitions(t *testing.T) {
 		assert.Less(t, v, 1000)
 	}
 }
+
+func TestMultipleRepartitionsWithBuffer(t *testing.T) {
+	in := make(chan int)
+	go func() {
+		for i := range 1000 {
+			in <- i
+		}
+		close(in)
+	}()
+	ctx := context.Background()
+
+	outs1 := shard.Repartition[int](10).WithBuffer(5).Apply(ctx, in)
+	assert.Len(t, outs1, 10)
+	assert.Equal(t, 5, cap(outs1[0]))
+	outs2 := shard.Repartition[int](1).WithBuffer(20).Apply(ctx, outs1...)
+	require.Len(t, outs2, 1)
+	assert.Equal(t, 20, cap(outs2[0]))
+	seen := make([]bool, 1000)
+	for v := range outs2[0] {
+		assert.False(t, seen[v])
+		seen[v] = true
+		assert.LessOrEqual(t, 0, v)
+		assert.Less(t, v, 1000)
+	}
+}
+
+func TestRepartitionWithRoute(t *testing.T) {
+	in := make(chan int)
+	go func() {
+		for i := range 1000 {
+			in <- i
+		}
+		close(in)
+	}()
+	ctx := context.Background()
+
+	route := func() shard.RouteFunc[int] {
+		return func(inShard int, job int, v int) int {
+			if v >= 500 {
+				return 1
+			}
+			return 0
+		}
+	}
+
+	outs := shard.Repartition[int](2).WithRoute(route()).Apply(ctx, in)
+	assert.Len(t, outs, 2)
+	assert.Equal(t, 1, cap(outs[0]))
+
+	seen := make([]bool, 1000)
+	wg := sync.WaitGroup{}
+	for shard, out := range outs {
+		wg.Go(func() {
+			for v := range out {
+				assert.False(t, seen[v])
+				seen[v] = true
+				if shard == 0 {
+					assert.LessOrEqual(t, 0, v)
+					assert.Less(t, v, 500)
+				} else {
+					assert.LessOrEqual(t, 500, v)
+					assert.Less(t, v, 1000)
+				}
+			}
+		})
+	}
+	wg.Wait()
+}
