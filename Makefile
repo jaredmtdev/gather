@@ -10,7 +10,7 @@ help: ## Show this help message.
 
 .PHONY: test
 test: ## Run unit tests.
-	go test -race ./...
+	go test -race -coverprofile=coverage.out $(go list ./... | grep -v "examples")
 
 .PHONY: lint
 lint: ## show linting issues.
@@ -19,3 +19,8 @@ lint: ## show linting issues.
 .PHONY: lint-fix
 lint-fix: ## Attempt to fix linting issues.
 	golangci-lint run --fix .
+
+.PHONY: coverage
+coverage: ## show coverage in html
+	go tool cover -html=coverage.out -o coverage.html
+	open coverage.html
