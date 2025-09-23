@@ -76,4 +76,5 @@ or if you need pipeline semantics that errgroup and sync.WaitGroup don't give yo
 ## Future Ideas
 
 - sharding across multiple channels
-- include `WithEventHook(hook func(Event))Opt` which can be used for logging/debugging
+- seq package: offer synchronous helpers that utilize iter.Seq and integrate nicely with Gather
+- include `WithEventHook(hook func(Event)) Opt` which can be used for logging/debugging
