@@ -1,8 +1,0 @@
-TODO:
-
--set up testing for shard package
--is there a way to preserve order during repartition?
-
-TODO:
--set up more tests
--think of way to preserve order during repartition

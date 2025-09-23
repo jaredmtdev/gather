@@ -5,35 +5,75 @@ It helps you build **worker pools, pipelines, and middleware**.
 
 ## Quick Example
 
+```go
+opts := []gather.Opt{
+    gather.WithWorkerSize(100),
+    gather.WithBufferSize(10),
+    gather.WithOrderPreserved(),
+}
+
+handler := func(ctx context.Context, in Foo, _ *gather.Scope[Foo]) (Bar, error) {
+    // do work...
+    return Bar{}, nil
+}
+
+out := gather.Workers(ctx, in, handler, opts...) 
+
+for v := range out {
+    // consume
+}
+```
+
 ## Install
 
-`go get github.com/???/Gather`
+`go get github.com/???/gather`
 
 ## API at a glance
 
-- Workers: function to start a worker pool
-- HandlerFunc: function to handle each request sent to worker pool
-- Scope: provided to HandlerFunc to enable Retries, safe go routines, etc
-- Middleware: helper to allow you to wrap middleware around the handler
-- Chain: helper to more cleanly chain middleware together
+- Workers: start a worker pool that consumes an input channel and returns an output channel
+- HandlerFunc: handles each job
+- Scope: tools available to a handler (retries, safe go routines, etc)
+- Middleware: wrap handlers and other middleware
+- Chain: chains multiple middleware
 
 ## Design Philosophy
 
-Gather provides the glue: the tools for workers, pipelines, and middleware.  
+Gather provides the glue: workers, pipelines, and middleware.  
 You design the concurrency patterns that fit your use case.
 
-Gather is simple because it:
+### Simple
 
-- enables developers to build almost any concurrency model
-- provides familiar middleware mechanisms (like "net/http")
-- decouples middleware logic from business logic for easier testing and debugging
+- familiar middleware model (like "net/http")
+- decouples middleware plumbing from business logic
+- uses plain go primitives: context, channels, and functions
 
-Gather is flexible because it:
+### Flexible
 
 - leaves retry and error handling decisions to you
-- lets you manage input/ouput channels directly
-- avoids bias or enforcement of any particular pattern
+- lets you manage input/output channels directly
+- no global state
+- context-aware: honors cancellations, timeouts, and deadlines
+
+## Should I use Gather?
+
+Use Gather if channels are unavoidable
+or if you need pipeline semantics that errgroup and sync.WaitGroup don't give you
+
+### When Gather is a good fit
+
+- you need middleware like retries, circuit breakers, backpressure, timeouts, log, etc
+- multi-stage pipelines with fan-out/fan-in
+- optional ordering with a reorder gate
+- composability of stages
+
+### When a simpler tool is better
+
+- run independent tasks concurrently and stop on the first error -> use `errgroup`
+- short-lived CPU-bound work -> use `sync.WaitGroup`
+- background task waiting to close a channel -> use plain goroutine
+- simple generator -> use plain goroutine
 
 ## Future Ideas
 
 - sharding across multiple channels
+- include `WithEventHook(hook func(Event))Opt` which can be used for logging/debugging
