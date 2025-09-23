@@ -11,8 +11,7 @@ type RouteFunc[T any] func(inShard int, job int, v T) (outShard int)
 
 // Repartitioner - used to configure a repartition
 //
-// note:
-// - repartitioning cannot guarantee order
+// repartitioning cannot guarantee order
 type Repartitioner[T any] struct {
 	partitionSize int
 	bufferSize    *int
