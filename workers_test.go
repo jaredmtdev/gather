@@ -245,7 +245,7 @@ func TestWorkersOrderedWithEarlyCancel(t *testing.T) {
 		defer cancel()
 
 		mw := gather.Chain(
-			mwCancelOnInput[int, int](5, cancel),
+			mwCancelOnInput[int, int](20, cancel),
 			mwRandomDelay[int, int](time.Now().UnixNano(), 0, time.Second),
 		)
 		opts := []gather.Opt{
@@ -255,11 +255,11 @@ func TestWorkersOrderedWithEarlyCancel(t *testing.T) {
 		}
 
 		var got int
-		for v := range gather.Workers(ctx, gen(ctx, 20), mw(add(3)), opts...) {
+		for v := range gather.Workers(ctx, gen(ctx, 200), mw(add(3)), opts...) {
 			require.Equal(t, got+3, v)
 			got++
 		}
-		assert.Less(t, got, 3+5)
+		assert.Less(t, got, 3+20)
 	})
 }
 
