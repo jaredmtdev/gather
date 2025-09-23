@@ -177,3 +177,76 @@ func TestRepartitionWithNoInputShards(t *testing.T) {
 	wg.Wait()
 	assert.Contains(t, <-panicCh, "must send at least 1 input channel")
 }
+
+func TestRepartitionWithNoPartitions(t *testing.T) {
+	ctx := context.Background()
+	panicCh := make(chan any, 1)
+	in := make(chan int)
+	defer close(in)
+	wg := sync.WaitGroup{}
+	wg.Go(func() {
+		defer func() {
+			if r := recover(); r != nil {
+				panicCh <- r
+				close(panicCh)
+			}
+		}()
+		shard.Repartition[int](0).Apply(ctx, in)
+	})
+	wg.Wait()
+	assert.Contains(t, <-panicCh, "must have at least 1 partition")
+}
+
+func TestRepartitionOneToManyEarlyCancel(t *testing.T) {
+	in := make(chan int)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		defer close(in)
+		for i := range 100 {
+			if i == 30 {
+				cancel()
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case in <- i:
+			}
+		}
+	}()
+	outs := shard.Repartition[int](10).Apply(ctx, in)
+	assert.Len(t, outs, 10)
+	seen := make([]bool, 100)
+	wg := sync.WaitGroup{}
+	for s := range 10 {
+		wg.Go(func() {
+			for v := range outs[s] {
+				assert.False(t, seen[v])
+				assert.LessOrEqual(t, 0, v)
+				assert.Less(t, v, 30)
+				seen[v] = true
+			}
+		})
+	}
+	wg.Wait()
+}
+
+func TestRepartitionOneToManyEarlyCancelDuringRepartition(t *testing.T) {
+	// send to in chan and then block from being able to send to out chan
+	in := make(chan int, 1)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		defer close(in)
+		in <- 0
+	}()
+	outs := shard.Repartition[int](1).WithBuffer(0).Apply(ctx, in)
+	require.Len(t, outs, 1)
+	out := outs[0]
+	cancel()
+	var got int
+	for range out {
+		got++
+	}
+	assert.Equal(t, 0, got)
+}
