@@ -62,6 +62,7 @@ func FromChan[T any](ctx context.Context, in <-chan T) iter.Seq[T] {
 	}
 }
 
+// FromChans - slice of channels to slice of iter.Seq
 func FromChans[T any](ctx context.Context, ins []<-chan T) []iter.Seq[T] {
 	outs := make([]iter.Seq[T], len(ins))
 	for i, in := range ins {
