@@ -91,6 +91,11 @@ func (ws *workerStation[IN, OUT]) Enqueue(ctx context.Context, in <-chan IN) {
 	wgEnqueue.Go(func() {
 		var indexCounter uint64
 		for v := range in {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
 			ws.wgJob.Add(1)
 			select {
 			case <-ctx.Done():
@@ -114,6 +119,7 @@ func (ws *workerStation[IN, OUT]) buildEnqueueFunc(ctx context.Context, index ui
 	return func(v IN) {
 		select {
 		case <-ctx.Done():
+			ws.wgJob.Done()
 		case ws.queue <- job[IN]{val: v, index: index}:
 		}
 	}

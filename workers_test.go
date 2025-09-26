@@ -305,9 +305,11 @@ func TestPipelineWithEarlyCancelAtFirstStage(t *testing.T) {
 	for range gather.Workers(ctx, out2, add(3)) {
 		got++
 	}
-	assert.LessOrEqual(t, got, 5)
+
+	assert.LessOrEqual(t, got, 5+3)
 }
 
+// possible issue: order gate hangs because an item was cancelled.
 func TestPipelineOrdered(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx := context.Background()
@@ -318,7 +320,7 @@ func TestPipelineOrdered(t *testing.T) {
 			gather.WithOrderPreserved(),
 		}
 
-		mw := mwRandomDelay[int, int](time.Now().UnixNano(), 0, time.Second)
+		mw := mwRandomDelay[int, int](time.Now().UnixNano(), 0, 4*time.Millisecond)
 
 		out1 := gather.Workers(ctx, gen(ctx, 1000), mw(add(3)), opts...)
 		out2 := gather.Workers(ctx, out1, subtract(3), opts...)

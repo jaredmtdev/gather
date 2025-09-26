@@ -118,7 +118,7 @@ func mwCancelOnCount[IN any, OUT any](cancelOn int32, cancel context.CancelFunc)
 	count := atomic.Int32{}
 	return func(next gather.HandlerFunc[IN, OUT]) gather.HandlerFunc[IN, OUT] {
 		return func(ctx context.Context, in IN, scope *gather.Scope[IN]) (OUT, error) {
-			if count.Add(1) == cancelOn {
+			if count.Add(1) >= cancelOn {
 				cancel()
 				var v OUT
 				return v, ctx.Err()
