@@ -3,29 +3,32 @@ package gather
 import (
 	"context"
 	"testing"
+	"testing/synctest"
 	"time"
 )
 
 func TestReorder_CancelWhileBlockedOnOut(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
-	out := make(chan int)
-	ordered := make(chan job[int], 1)
+		out := make(chan int)
+		ordered := make(chan job[int])
 
-	ws := &workerStation[int, int]{out: out, ordered: ordered}
+		ws := &workerStation[int, int]{out: out, ordered: ordered}
 
-	done := make(chan struct{})
-	go func() { ws.Reorder(ctx); close(done) }()
+		done := make(chan struct{})
+		go func() { ws.Reorder(ctx); close(done) }()
 
-	// send job to ordered chan but block from sending to out chan
-	ordered <- job[int]{val: 42, index: 0}
+		// send job to ordered chan but block from sending to out chan
+		ordered <- job[int]{val: 42, index: 0}
 
-	cancel()
+		cancel()
 
-	select {
-	case <-done:
-	case <-time.After(1 * time.Millisecond):
-		t.Fatal("reorder did not exit on cancel")
-	}
+		select {
+		case <-done:
+		case <-time.After(1 * time.Millisecond):
+			t.Fatal("reorder did not exit on cancel")
+		}
+	})
 }
