@@ -61,6 +61,35 @@ func TestScopeRetryAfter(t *testing.T) {
 	})
 }
 
+func TestScopeRetryAfterWithEarlyCancel(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		totalAttempts := atomic.Int32{}
+		delayUntilRetry := 100 * time.Millisecond
+
+		handler := gather.HandlerFunc[int, int](func(ctx context.Context, in int, scope *gather.Scope[int]) (int, error) {
+			totalAttempts.Add(1)
+			if in >= 2 {
+				scope.RetryAfter(ctx, in+1, delayUntilRetry)
+				cancel()
+				return 0, errors.New("invalid number")
+			}
+			return in * 2, nil
+		})
+
+		start := time.Now()
+		var got int
+		for range gather.Workers(ctx, gen(ctx, 10), handler, gather.WithWorkerSize(3)) {
+			got++
+		}
+		duration := time.Since(start)
+		assert.LessOrEqual(t, got, 3+2)
+		assert.LessOrEqual(t, totalAttempts.Load(), int32(2+3))
+		assert.LessOrEqual(t, duration.Milliseconds(), delayUntilRetry.Milliseconds())
+	})
+}
+
 func TestScopeRetryAfterWhenNoError(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx := context.Background()

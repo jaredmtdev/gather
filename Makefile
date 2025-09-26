@@ -12,6 +12,10 @@ help: ## Show this help message.
 test: ## Run unit tests.
 	go test -race -coverprofile=coverage.out `go list ./... | grep -v 'examples'`
 
+.PHONY: testx
+testx: ## Run unit tests multiple times.
+	go test -count=5 `go list ./... | grep -v 'examples'`
+
 .PHONY: lint
 lint: ## Show linting issues.
 	golangci-lint run .
@@ -24,3 +28,7 @@ lint-fix: ## Attempt to fix linting issues.
 coverage: ## Show coverage in html.
 	go tool cover -html=coverage.out -o coverage.html
 	open coverage.html
+
+.PHONY: vulncheck
+vulncheck: ## Check for vulnerabilities in dependencies.
+	govulncheck ./...

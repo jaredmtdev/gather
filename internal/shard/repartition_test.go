@@ -206,6 +206,7 @@ func TestRepartitionOneToManyEarlyCancel(t *testing.T) {
 		for i := range 100 {
 			if i == 30 {
 				cancel()
+				return
 			}
 			select {
 			case <-ctx.Done():
@@ -231,22 +232,34 @@ func TestRepartitionOneToManyEarlyCancel(t *testing.T) {
 	wg.Wait()
 }
 
-func TestRepartitionOneToManyEarlyCancelDuringRepartition(t *testing.T) {
+func TestRepartitionOneToOneEarlyCancelDuringRepartition(t *testing.T) {
 	// send to in chan and then block from being able to send to out chan
-	in := make(chan int, 1)
+	in := make(chan int)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go func() {
 		defer close(in)
-		in <- 0
+		for i := range 2 {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+			select {
+			case <-ctx.Done():
+			case in <- i + 1:
+			}
+		}
 	}()
 	outs := shard.Repartition[int](1).WithBuffer(0).Apply(ctx, in)
 	require.Len(t, outs, 1)
 	out := outs[0]
+	require.Equal(t, 0, cap(out))
 	cancel()
 	var got int
-	for range out {
+	for v := range out {
+		assert.Equal(t, 1, v)
 		got++
 	}
-	assert.Equal(t, 0, got)
+	assert.LessOrEqual(t, got, 1)
 }
