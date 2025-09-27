@@ -114,8 +114,8 @@ func (ws *workerStation[IN, OUT]) Enqueue(ctx context.Context, in <-chan IN) {
 	}()
 }
 
-// buildEnqueueFunc - builds the enqueue func used during retries to send (possibly  modified) input back into queue.
-func (ws *workerStation[IN, OUT]) buildEnqueueFunc(ctx context.Context, index uint64) func(IN) {
+// buildReenqueueFunc - builds the re-enqueue func used during retries to send (possibly modified) input back into queue.
+func (ws *workerStation[IN, OUT]) buildReenqueueFunc(ctx context.Context, index uint64) func(IN) {
 	return func(v IN) {
 		select {
 		case <-ctx.Done():
@@ -131,7 +131,6 @@ func (ws *workerStation[IN, OUT]) SendResult(ctx context.Context, jobOut job[OUT
 	if ws.orderPreserved {
 		select {
 		case <-ctx.Done():
-			return
 		case ws.ordered <- jobOut:
 		}
 		return
@@ -139,7 +138,6 @@ func (ws *workerStation[IN, OUT]) SendResult(ctx context.Context, jobOut job[OUT
 	if err == nil {
 		select {
 		case <-ctx.Done():
-			return
 		case ws.out <- jobOut.val:
 		}
 	}
@@ -149,6 +147,10 @@ func (ws *workerStation[IN, OUT]) SendResult(ctx context.Context, jobOut job[OUT
 func (ws *workerStation[IN, OUT]) StartWorker(ctx context.Context) {
 	select {
 	case <-ctx.Done():
+		// drain
+		for range ws.queue {
+			ws.wgJob.Done()
+		}
 		return
 	default:
 	}
@@ -162,7 +164,7 @@ func (ws *workerStation[IN, OUT]) StartWorker(ctx context.Context) {
 		default:
 		}
 		scope := Scope[IN]{
-			enqueue:     ws.buildEnqueueFunc(ctx, jobIn.index),
+			reenqueue:   ws.buildReenqueueFunc(ctx, jobIn.index),
 			wgJob:       &ws.wgJob,
 			once:        &sync.Once{},
 			retryClosed: &syncvalue.Value[bool]{},

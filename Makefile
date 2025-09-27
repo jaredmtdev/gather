@@ -14,7 +14,7 @@ test: ## Run unit tests.
 
 .PHONY: testx
 testx: ## Run unit tests multiple times.
-	go test -v -count=100 `go list ./... | grep -v 'examples'`
+	go test -v -count=100 `go list ./... | grep -v 'examples'` -timeout=1m
 
 .PHONY: lint
 lint: ## Show linting issues.
