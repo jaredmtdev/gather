@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"gather"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -57,19 +56,17 @@ func TestWorkersSynchronousNilChanWithPanicOnNil(t *testing.T) {
 }
 
 func TestWorkersSynchronousOrdered(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		ctx := context.Background()
-		opts := []gather.Opt{
-			gather.WithOrderPreserved(),
-		}
-		mw := mwRandomDelay[int, int](time.Now().UnixNano(), 0, time.Second)
-		var got int
-		for v := range gather.Workers(ctx, gen(ctx, 1000), mw(add(3)), opts...) {
-			require.Equal(t, got+3, v)
-			got++
-		}
-		assert.Equal(t, 1000, got)
-	})
+	ctx := context.Background()
+	opts := []gather.Opt{
+		gather.WithOrderPreserved(),
+	}
+	mw := mwRandomDelay[int, int](time.Now().UnixNano(), 0, 400*time.Nanosecond)
+	var got int
+	for v := range gather.Workers(ctx, gen(ctx, 1000), mw(add(3)), opts...) {
+		require.Equal(t, got+3, v)
+		got++
+	}
+	assert.Equal(t, 1000, got)
 }
 
 func TestWorkersSynchronousOrderedWithEarlyCancel(t *testing.T) {
@@ -223,21 +220,19 @@ func TestMultipleWorkers(t *testing.T) {
 }
 
 func TestWorkersOrdered(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		ctx := context.Background()
-		opts := []gather.Opt{
-			gather.WithWorkerSize(5),
-			gather.WithBufferSize(2),
-			gather.WithOrderPreserved(),
-		}
-		mw := mwRandomDelay[int, int](time.Now().UnixNano(), 0, 4*time.Millisecond)
-		var got int
-		for v := range gather.Workers(ctx, gen(ctx, 1000), mw(add(3)), opts...) {
-			require.Equal(t, got+3, v)
-			got++
-		}
-		assert.Equal(t, 1000, got)
-	})
+	ctx := context.Background()
+	opts := []gather.Opt{
+		gather.WithWorkerSize(5),
+		gather.WithBufferSize(2),
+		gather.WithOrderPreserved(),
+	}
+	mw := mwRandomDelay[int, int](time.Now().UnixNano(), 0, 400*time.Nanosecond)
+	var got int
+	for v := range gather.Workers(ctx, gen(ctx, 1000), mw(add(3)), opts...) {
+		require.Equal(t, got+3, v)
+		got++
+	}
+	assert.Equal(t, 1000, got)
 }
 
 func TestWorkersOrderedWithEarlyCancel(t *testing.T) {
@@ -265,18 +260,15 @@ func TestWorkersOrderedWithEarlyCancel(t *testing.T) {
 }
 
 func TestPipelineWithBackPressure(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		ctx := context.Background()
-		//mw := mwRandomDelay[int, int](time.Now().UnixNano(), 0, 400*time.Nanosecond)
-		//out1 := gather.Workers(ctx, gen(ctx, 1000), mw(add(3)), gather.WithWorkerSize(5), gather.WithBufferSize(5))
-		out1 := gather.Workers(ctx, gen(ctx, 1000), add(3), gather.WithWorkerSize(5), gather.WithBufferSize(5))
-		//out2 := gather.Workers(ctx, out1, subtract(3), gather.WithWorkerSize(2))
-		var got int
-		for range gather.Workers(ctx, out1, add(3)) {
-			got++
-		}
-		assert.Equal(t, 1000, got)
-	})
+	ctx := context.Background()
+	mw := mwRandomDelay[int, int](time.Now().UnixNano(), 0, 400*time.Nanosecond)
+	out1 := gather.Workers(ctx, gen(ctx, 1000), mw(add(3)), gather.WithWorkerSize(5), gather.WithBufferSize(5))
+	// out2 := gather.Workers(ctx, out1, subtract(3), gather.WithWorkerSize(2))
+	var got int
+	for range gather.Workers(ctx, out1, add(3)) {
+		got++
+	}
+	assert.Equal(t, 1000, got)
 }
 
 func TestPipelineWithEarlyCancelAtLastStage(t *testing.T) {
@@ -314,65 +306,53 @@ func TestPipelineWithEarlyCancelAtFirstStage(t *testing.T) {
 	assert.LessOrEqual(t, got, 5+3)
 }
 
-// seems to only be an issue with ordered
-/*
-gets stuck on:
-wgWorker.Wait()
-wgEnqueue.Wait()
-range ws.queue (inside StartWorker)
-range ws.ordered (insider Reorder)
-send to ws.queue (inside Enqueue)
-getting response from handler
-*/
 func TestPipelineOrdered(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		ctx := context.Background()
+	ctx := context.Background()
 
-		opts := []gather.Opt{
-			gather.WithWorkerSize(5),
-			gather.WithBufferSize(5),
-			gather.WithOrderPreserved(),
-		}
+	opts := []gather.Opt{
+		gather.WithWorkerSize(5),
+		gather.WithBufferSize(5),
+		gather.WithOrderPreserved(),
+	}
 
-		mw := mwRandomDelay[int, int](time.Now().UnixNano(), 0, 4*time.Millisecond)
+	mw := mwRandomDelay[int, int](time.Now().UnixNano(), 0, 400*time.Nanosecond)
 
-		out1 := gather.Workers(ctx, gen(ctx, 1000), mw(add(3)), opts...)
-		out2 := gather.Workers(ctx, out1, subtract(3), opts...)
-		var got int
-		for v := range gather.Workers(ctx, out2, add(3), gather.WithOrderPreserved()) {
-			require.Equal(t, got+3, v)
-			got++
-		}
-		assert.Equal(t, 1000, got)
-	})
+	out1 := gather.Workers(ctx, gen(ctx, 1000), mw(add(3)), opts...)
+	out2 := gather.Workers(ctx, out1, subtract(3), opts...)
+	var got int
+	for v := range gather.Workers(ctx, out2, add(3), gather.WithOrderPreserved()) {
+		require.Equal(t, got+3, v)
+		got++
+	}
+	assert.Equal(t, 1000, got)
 }
 
 func TestPipelineOrderedWithEarlyCancelAtFirstStage(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+	// synctest.Test(t, func(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-		opts := []gather.Opt{
-			gather.WithWorkerSize(5),
-			gather.WithBufferSize(5),
-			gather.WithOrderPreserved(),
-		}
+	opts := []gather.Opt{
+		gather.WithWorkerSize(5),
+		gather.WithBufferSize(5),
+		gather.WithOrderPreserved(),
+	}
 
-		// should cancel on input of 4
-		mw := gather.Chain(
-			mwCancelOnCount[int, int](5, cancel),
-			mwRandomDelay[int, int](time.Now().UnixNano(), 0, time.Second),
-		)
+	// should cancel on input of 4
+	mw := gather.Chain(
+		mwCancelOnCount[int, int](5, cancel),
+		mwRandomDelay[int, int](time.Now().UnixNano(), 0, 400*time.Nanosecond),
+	)
 
-		out1 := gather.Workers(ctx, gen(ctx, 20), mw(add(3)), opts...)
-		out2 := gather.Workers(ctx, out1, subtract(3), opts...)
-		var got int
-		for v := range gather.Workers(ctx, out2, add(3), gather.WithOrderPreserved()) {
-			require.Equal(t, got+3, v)
-			got++
-		}
-		assert.Less(t, got, 5)
-	})
+	out1 := gather.Workers(ctx, gen(ctx, 20), mw(add(3)), opts...)
+	out2 := gather.Workers(ctx, out1, subtract(3), opts...)
+	var got int
+	for v := range gather.Workers(ctx, out2, add(3), gather.WithOrderPreserved()) {
+		require.Equal(t, got+3, v)
+		got++
+	}
+	assert.Less(t, got, 5)
+	// })
 }
 
 func TestWorkersInvalidBuffer(t *testing.T) {
