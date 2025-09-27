@@ -10,7 +10,7 @@ import (
 
 // Scope - gives the user some ability to do things that require internal mechanisms.
 type Scope[IN any] struct {
-	enqueue     func(IN)
+	reenqueue   func(IN)
 	willRetry   bool
 	retryClosed *syncvalue.Value[bool]
 	once        *sync.Once
@@ -31,7 +31,7 @@ func (s *Scope[IN]) RetryAfter(ctx context.Context, in IN, after time.Duration) 
 			case <-ctx.Done():
 				s.wgJob.Done()
 			case <-time.After(after):
-				s.enqueue(in)
+				s.reenqueue(in)
 			}
 		})
 	})

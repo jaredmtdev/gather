@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"gather"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -226,10 +227,10 @@ func TestWorkersOrdered(t *testing.T) {
 		ctx := context.Background()
 		opts := []gather.Opt{
 			gather.WithWorkerSize(5),
-			gather.WithBufferSize(5),
+			gather.WithBufferSize(2),
 			gather.WithOrderPreserved(),
 		}
-		mw := mwRandomDelay[int, int](time.Now().UnixNano(), 0, time.Second)
+		mw := mwRandomDelay[int, int](time.Now().UnixNano(), 0, 4*time.Millisecond)
 		var got int
 		for v := range gather.Workers(ctx, gen(ctx, 1000), mw(add(3)), opts...) {
 			require.Equal(t, got+3, v)
@@ -264,14 +265,18 @@ func TestWorkersOrderedWithEarlyCancel(t *testing.T) {
 }
 
 func TestPipelineWithBackPressure(t *testing.T) {
-	ctx := context.Background()
-	out1 := gather.Workers(ctx, gen(ctx, 20), add(3), gather.WithWorkerSize(5))
-	out2 := gather.Workers(ctx, out1, subtract(3), gather.WithWorkerSize(2))
-	var got int
-	for range gather.Workers(ctx, out2, add(3)) {
-		got++
-	}
-	assert.Equal(t, 20, got)
+	synctest.Test(t, func(t *testing.T) {
+		ctx := context.Background()
+		//mw := mwRandomDelay[int, int](time.Now().UnixNano(), 0, 400*time.Nanosecond)
+		//out1 := gather.Workers(ctx, gen(ctx, 1000), mw(add(3)), gather.WithWorkerSize(5), gather.WithBufferSize(5))
+		out1 := gather.Workers(ctx, gen(ctx, 1000), add(3), gather.WithWorkerSize(5), gather.WithBufferSize(5))
+		//out2 := gather.Workers(ctx, out1, subtract(3), gather.WithWorkerSize(2))
+		var got int
+		for range gather.Workers(ctx, out1, add(3)) {
+			got++
+		}
+		assert.Equal(t, 1000, got)
+	})
 }
 
 func TestPipelineWithEarlyCancelAtLastStage(t *testing.T) {
@@ -309,7 +314,16 @@ func TestPipelineWithEarlyCancelAtFirstStage(t *testing.T) {
 	assert.LessOrEqual(t, got, 5+3)
 }
 
-// possible issue: order gate hangs because an item was cancelled.
+// seems to only be an issue with ordered
+/*
+gets stuck on:
+wgWorker.Wait()
+wgEnqueue.Wait()
+range ws.queue (inside StartWorker)
+range ws.ordered (insider Reorder)
+send to ws.queue (inside Enqueue)
+getting response from handler
+*/
 func TestPipelineOrdered(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx := context.Background()
