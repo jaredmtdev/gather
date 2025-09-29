@@ -2,11 +2,9 @@ name: Test
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   test:
@@ -19,11 +17,46 @@ jobs:
           go-version-file: go.mod
       - name: go env
         run: go env
-      - name: Run Go tests
-        run: go test -race -v `go list ./... | grep -v 'examples'` -coverprofile=coverage.out
-      - name: Check Coverage
+      - name: Run Go tests (with coverage)
         run: |
-          go tool cover -func coverage.out
-          coverage=$(go tool cover -func coverage.out | tail -1 | awk '{ print $3; }')
-          echo "total coverage: $coverage"
-          [[ $coverage != "100.0%" ]] && exit 1
+          PKGS=$(go list ./... | grep -v 'examples' || true)
+          go test -race -covermode=atomic \
+            -coverpkg=$(echo "$PKGS" | tr '\n' ',') \
+            -coverprofile=coverage.out \
+            $PKGS
+      - name: Build coverage HTML
+        run: go tool cover -html=coverage.out -o coverage.html
+      - name: Compute coverage %
+        id: cover
+        run: |
+          pct=$(go tool cover -func=coverage.out | awk '/^total:/ {print $3}')
+          echo "pct=$pct" >> $GITHUB_OUTPUT
+          if [ "$pct" = "100.0%" ]; then echo "ok=true" >> $GITHUB_OUTPUT; else echo "ok=false" >> $GITHUB_OUTPUT; fi
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage.out
+            coverage.html
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Add run summary with link
+        if: always()
+        run: |
+          {
+            echo "### Test Coverage"
+            echo ""
+            echo "**Total:** ${{ steps.cover.outputs.pct }}"
+            echo ""
+            echo "[Download coverage.html](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Enforce 100% coverage
+        if: ${{ steps.cover.outputs.ok != 'true' }}
+        run: |
+          echo "Coverage is ${{ steps.cover.outputs.pct }}, expected 100%."
+          exit 1
