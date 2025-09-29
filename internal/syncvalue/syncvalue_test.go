@@ -1,10 +1,10 @@
 package syncvalue_test
 
 import (
-	"github.com/jaredmtdev/gather/internal/syncvalue"
 	"sync"
 	"testing"
 
+	"github.com/jaredmtdev/gather/internal/syncvalue"
 	"github.com/stretchr/testify/assert"
 )
 

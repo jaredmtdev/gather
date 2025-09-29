@@ -7,24 +7,26 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/jaredmtdev/gather"
-	"github.com/jaredmtdev/gather/examples/internal/samplegen"
 	"math/rand"
 	"sync"
 	"time"
+
+	"github.com/jaredmtdev/gather"
+	"github.com/jaredmtdev/gather/examples/errchan/errs"
+	"github.com/jaredmtdev/gather/examples/internal/samplegen"
 )
 
 func main() {
 	errCh := make(chan error)
 	addHandler := func(num int) gather.HandlerFunc[int, int] {
-		return func(ctx context.Context, in int, scope *gather.Scope[int]) (int, error) {
+		return func(ctx context.Context, in int, _ *gather.Scope[int]) (int, error) {
 			select {
 			case <-time.After(time.Duration(rand.Intn(200)) * time.Millisecond):
 			case <-ctx.Done():
 				return 0, ctx.Err()
 			}
 			if in == 15 || in == 16 {
-				err := fmt.Errorf("%v: invalid number", in)
+				err := errs.NewErrInvalidNumber(in)
 				select {
 				case <-ctx.Done():
 				case errCh <- err:
@@ -59,5 +61,4 @@ func main() {
 	fmt.Println("done!")
 	time.Sleep(time.Second)
 	fmt.Println("shutting down")
-
 }

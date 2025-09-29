@@ -3,9 +3,10 @@ package samplemiddleware
 import (
 	"context"
 	"fmt"
-	"github.com/jaredmtdev/gather"
 	"sync/atomic"
 	"time"
+
+	"github.com/jaredmtdev/gather"
 )
 
 /*
@@ -13,7 +14,7 @@ simple examples of middlewares that can be built to work with this library
 */
 
 // RetryAfter - retries after given time delay
-// by default, will always retry unless shouldRetry is defined
+// by default, will always retry unless shouldRetry is defined.
 func RetryAfter[IN, OUT any](d time.Duration, shouldRetry ...func(i IN) (newIn IN, should bool)) gather.Middleware[IN, OUT] {
 	if len(shouldRetry) == 0 {
 		shouldRetry = append(shouldRetry, func(i IN) (IN, bool) { return i, true })
@@ -36,7 +37,7 @@ func RetryAfter[IN, OUT any](d time.Duration, shouldRetry ...func(i IN) (newIn I
 	}
 }
 
-// Logger - prints input/ouput/error data
+// Logger - prints input/output/error data.
 func Logger[IN any, OUT any](infoPrefix, errorPrefix string) gather.Middleware[IN, OUT] {
 	return func(next gather.HandlerFunc[IN, OUT]) gather.HandlerFunc[IN, OUT] {
 		return gather.HandlerFunc[IN, OUT](func(ctx context.Context, in IN, s *gather.Scope[IN]) (OUT, error) {
@@ -51,7 +52,7 @@ func Logger[IN any, OUT any](infoPrefix, errorPrefix string) gather.Middleware[I
 	}
 }
 
-// Timeout - add timeout on each request
+// Timeout - add timeout on each request.
 func Timeout[IN any, OUT any](duration time.Duration) gather.Middleware[IN, OUT] {
 	return func(next gather.HandlerFunc[IN, OUT]) gather.HandlerFunc[IN, OUT] {
 		return gather.HandlerFunc[IN, OUT](func(ctx context.Context, in IN, s *gather.Scope[IN]) (OUT, error) {
@@ -67,13 +68,13 @@ type counter[IN, OUT any] struct {
 	count atomic.Uint64
 }
 
-// Counter - stateful middleware that keeps track of how many requests are being made
-func Counter[IN, OUT any](every int) gather.Middleware[IN, OUT] {
+// Counter - stateful middleware that keeps track of how many requests are being made.
+func Counter[IN, OUT any](every uint64) gather.Middleware[IN, OUT] {
 	if every <= 0 {
 		every = 1
 	}
 	c := &counter[IN, OUT]{
-		every: uint64(every),
+		every: every,
 	}
 	return func(next gather.HandlerFunc[IN, OUT]) gather.HandlerFunc[IN, OUT] {
 		return gather.HandlerFunc[IN, OUT](func(

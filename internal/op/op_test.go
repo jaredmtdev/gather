@@ -1,9 +1,9 @@
 package op_test
 
 import (
-	"github.com/jaredmtdev/gather/internal/op"
 	"testing"
 
+	"github.com/jaredmtdev/gather/internal/op"
 	"github.com/stretchr/testify/assert"
 )
 
