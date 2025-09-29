@@ -3,14 +3,15 @@ package shard_test
 import (
 	"context"
 	"fmt"
-	"github.com/jaredmtdev/gather"
-	"github.com/jaredmtdev/gather/internal/shard"
 	"sync"
 	"testing"
+
+	"github.com/jaredmtdev/gather"
+	"github.com/jaredmtdev/gather/internal/shard"
 )
 
 // go test -bench=BenchmarkWorkers ./internal/shard -benchtime=5x
-// best results: 10k shards and 10 workers/shard
+// best results: 10k shards and 10 workers/shard.
 func BenchmarkWorkers(b *testing.B) {
 	workerBuffer := 100
 	jobs := 1_000_000

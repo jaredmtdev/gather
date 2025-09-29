@@ -1,4 +1,4 @@
-// shard - package used to multiply stages into shards
+// Package shard - package used to multiply stages into shards
 // in most cases: just use gather.Workers
 //
 // some situations where sharding might make sense:

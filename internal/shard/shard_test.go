@@ -2,12 +2,12 @@ package shard_test
 
 import (
 	"context"
-	"github.com/jaredmtdev/gather"
-	"github.com/jaredmtdev/gather/internal/shard"
 	"sync"
 	"sync/atomic"
 	"testing"
 
+	"github.com/jaredmtdev/gather"
+	"github.com/jaredmtdev/gather/internal/shard"
 	"github.com/stretchr/testify/assert"
 )
 

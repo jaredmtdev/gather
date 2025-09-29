@@ -2,12 +2,13 @@ package seq
 
 import (
 	"context"
-	"github.com/jaredmtdev/gather"
 	"iter"
+
+	"github.com/jaredmtdev/gather"
 )
 
 // Workers - integrates with gather.Workers using iter.Seq in place of channels
-// by default, the workers will use the same buffer as the input
+// by default, the workers will use the same buffer as the input.
 func Workers[IN, OUT any](
 	ctx context.Context,
 	in iter.Seq[IN],

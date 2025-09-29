@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/jaredmtdev/gather/internal/shard"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -216,7 +215,6 @@ func TestRepartitionOneToManyEarlyCancel(t *testing.T) {
 			case in <- i:
 				if i == 30 {
 					cancel()
-					//return
 				}
 			}
 		}

@@ -1,6 +1,6 @@
 package samplegen
 
-// Range - generates int values from 0 to n-1
+// Range - generates int values from 0 to n-1.
 func Range(n int, buffer ...int) <-chan int {
 	var bufferSize int
 	if len(buffer) > 0 && buffer[0] > 0 {

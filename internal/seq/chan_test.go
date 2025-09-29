@@ -2,11 +2,11 @@ package seq_test
 
 import (
 	"context"
-	"github.com/jaredmtdev/gather/internal/seq"
 	"iter"
 	"sync"
 	"testing"
 
+	"github.com/jaredmtdev/gather/internal/seq"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

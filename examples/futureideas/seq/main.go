@@ -8,9 +8,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"slices"
+
 	"github.com/jaredmtdev/gather"
 	"github.com/jaredmtdev/gather/internal/seq"
-	"slices"
 )
 
 func main() {
@@ -20,7 +21,7 @@ func main() {
 		vals[i] = i
 	}
 	add := func(num int) gather.HandlerFunc[int, int] {
-		return func(ctx context.Context, in int, _ *gather.Scope[int]) (int, error) {
+		return func(_ context.Context, in int, _ *gather.Scope[int]) (int, error) {
 			return in + num, nil
 		}
 	}

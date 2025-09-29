@@ -96,18 +96,30 @@ linters:
       min-complexity: 15
 
   exclusions:
+    paths:
+      - ^examples/futureideas/
     rules:
     - path: _test.go$
       linters: [gosec]
       text: G404 
     - path: _test.go$
-      linters: [err113]
+      linters: [err113,revive]
+    - path: ^examples/
+      linters: [revive]
+      text: package-comments
+    - path: ^examples/
+      linters: [mnd]
     - path: workers.go
       linters:
       - cyclop
       - funlen
     - linters: [revive]
       text: "empty-block: this block is empty, you can remove it"
+    - linters: [gosec]
+      text: "Use of weak random number generator"
+    - path: ^examples/
+      linters: [forbidigo]
+      
 
   disable:
     - unused # TODO: re-enable after tests/examples are finished

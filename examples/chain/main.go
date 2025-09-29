@@ -3,11 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"math/rand"
+	"time"
+
 	"github.com/jaredmtdev/gather"
 	"github.com/jaredmtdev/gather/examples/internal/samplegen"
 	"github.com/jaredmtdev/gather/examples/internal/samplemiddleware"
-	"math/rand"
-	"time"
 )
 
 func main() {
