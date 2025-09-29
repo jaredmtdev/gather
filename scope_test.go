@@ -90,6 +90,51 @@ func TestScopeRetryAfterWithEarlyCancel(t *testing.T) {
 	})
 }
 
+// cancels at the same time the retry should happen.
+func TestScopeRetryAfterWithCancelAtSameTime(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		totalAttempts := atomic.Int32{}
+		delayUntilRetry := 100 * time.Millisecond
+		workTime := 10 * time.Millisecond
+
+		handler := gather.HandlerFunc[int, int](func(ctx context.Context, in int, scope *gather.Scope[int]) (int, error) {
+			totalAttempts.Add(1)
+
+			// simulate work
+			select {
+			case <-ctx.Done():
+				return 0, ctx.Err()
+			case <-time.After(workTime):
+			}
+
+			if in >= 2 {
+				scope.RetryAfter(ctx, in+1, delayUntilRetry)
+				time.Sleep(time.Nanosecond) // let retry attempt just before cancelling
+				time.AfterFunc(delayUntilRetry, cancel)
+				return 0, errors.New("invalid number")
+			}
+			return in * 2, nil
+		})
+
+		start := time.Now()
+		var got int
+		for range gather.Workers(ctx, gen(ctx, 1000), handler, gather.WithWorkerSize(3)) {
+			got++
+		}
+		duration := time.Since(start)
+		assert.LessOrEqual(t, got, 3+2)
+
+		// all items of 2+: 3
+		// 3 workers: 3
+		// 10 ms work time x 3 workers: 10*3
+		totalAttemptsLessOrEqual := int32(3 + 3 + (10)*3)
+		assert.LessOrEqual(t, totalAttempts.Load(), totalAttemptsLessOrEqual)
+		assert.LessOrEqual(t, duration.Milliseconds(), delayUntilRetry.Milliseconds()+10)
+	})
+}
+
 func TestScopeRetryAfterWhenNoError(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx := context.Background()

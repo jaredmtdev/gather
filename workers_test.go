@@ -398,3 +398,28 @@ func TestWorkersInvalidWorkerSize(t *testing.T) {
 	assert.Equal(t, 0, got)
 	assert.Contains(t, <-panicCh, "must use at least 1 worker")
 }
+
+func TestWorkersChangeInputToNilThenCancel(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		in := make(chan int)
+		go func() {
+			for i := range 20 {
+				in <- i
+			}
+			in = nil
+			time.Sleep(time.Millisecond)
+			cancel()
+		}()
+		out := gather.Workers(ctx, in, add(3), gather.WithWorkerSize(3))
+		var expected int
+		seen := make([]bool, 20)
+		for v := range out {
+			assert.False(t, seen[v-3])
+			seen[v-3] = true
+			expected++
+		}
+		assert.Equal(t, 20, expected)
+	})
+}

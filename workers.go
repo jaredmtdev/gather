@@ -90,18 +90,23 @@ func (ws *workerStation[IN, OUT]) Enqueue(ctx context.Context, in <-chan IN) {
 	wgEnqueue := sync.WaitGroup{}
 	wgEnqueue.Go(func() {
 		var indexCounter uint64
-		for v := range in {
+		for {
+			var value IN
 			select {
+			case v, ok := <-in:
+				if !ok {
+					return
+				}
+				value = v
 			case <-ctx.Done():
 				return
-			default:
 			}
 			ws.wgJob.Add(1)
 			select {
 			case <-ctx.Done():
 				ws.wgJob.Done()
 				return
-			case ws.queue <- job[IN]{val: v, index: indexCounter}:
+			case ws.queue <- job[IN]{val: value, index: indexCounter}:
 				indexCounter++
 			}
 		}
