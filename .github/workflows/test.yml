@@ -26,4 +26,4 @@ jobs:
           go tool cover -func coverage.out
           coverage=$(go tool cover -func coverage.out | tail -1 | awk '{ print $3; }')
           echo "total coverage: $coverage"
-          [[ $coverage != "100.0%" ]] && exit 1
+          [[ $coverage == "100.0%" ]] || exit 1
