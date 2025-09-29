@@ -150,16 +150,6 @@ func (ws *workerStation[IN, OUT]) SendResult(ctx context.Context, jobOut job[OUT
 
 // StartWorker - starts a single worker to ingest the queue.
 func (ws *workerStation[IN, OUT]) StartWorker(ctx context.Context) {
-	select {
-	case <-ctx.Done():
-		// drain
-		for range ws.queue {
-			ws.wgJob.Done()
-		}
-		return
-	default:
-	}
-
 	for jobIn := range ws.queue {
 		select {
 		case <-ctx.Done():
