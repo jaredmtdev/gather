@@ -2,9 +2,10 @@ package shard_test
 
 import (
 	"context"
-	"github.com/jaredmtdev/gather/internal/shard"
 	"sync"
 	"testing"
+
+	"github.com/jaredmtdev/gather/internal/shard"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -198,20 +199,25 @@ func TestRepartitionWithNoPartitions(t *testing.T) {
 }
 
 func TestRepartitionOneToManyEarlyCancel(t *testing.T) {
-	in := make(chan int)
+	in := make(chan int, 1)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go func() {
 		defer close(in)
 		for i := range 100 {
-			if i == 30 {
-				cancel()
+			select {
+			case <-ctx.Done():
 				return
+			default:
 			}
 			select {
 			case <-ctx.Done():
 				return
 			case in <- i:
+				if i == 30 {
+					cancel()
+					//return
+				}
 			}
 		}
 	}()
@@ -224,7 +230,7 @@ func TestRepartitionOneToManyEarlyCancel(t *testing.T) {
 			for v := range outs[s] {
 				assert.False(t, seen[v])
 				assert.LessOrEqual(t, 0, v)
-				assert.Less(t, v, 30)
+				assert.LessOrEqual(t, v, 30)
 				seen[v] = true
 			}
 		})

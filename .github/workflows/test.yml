@@ -1,0 +1,29 @@
+name: Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: go env
+        run: go env
+      - name: Run Go tests
+        run: go test -race -v `go list ./... | grep -v 'examples'` -coverprofile=coverage.out
+      - name: Check Coverage
+        run: |
+          go tool cover -func coverage.out
+          coverage=$(go tool cover -func coverage.out | tail -1 | awk '{ print $3; }')
+          echo "total coverage: $coverage"
+          [[ $coverage == "100.0%" ]] || exit 1
