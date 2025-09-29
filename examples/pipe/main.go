@@ -8,8 +8,8 @@ package main
 import (
 	"context"
 	"fmt"
-	"gather"
-	"gather/examples/internal/samplegen"
+	"github.com/jaredmtdev/gather"
+	"github.com/jaredmtdev/gather/examples/internal/samplegen"
 	"math/rand"
 	"runtime"
 	"sync"

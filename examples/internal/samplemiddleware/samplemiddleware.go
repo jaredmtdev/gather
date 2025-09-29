@@ -3,7 +3,7 @@ package samplemiddleware
 import (
 	"context"
 	"fmt"
-	"gather"
+	"github.com/jaredmtdev/gather"
 	"sync/atomic"
 	"time"
 )
