@@ -2,8 +2,8 @@ package seq_test
 
 import (
 	"context"
-	"gather"
-	"gather/internal/seq"
+	"github.com/jaredmtdev/gather"
+	"github.com/jaredmtdev/gather/internal/seq"
 	"slices"
 	"strings"
 	"testing"

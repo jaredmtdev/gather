@@ -2,7 +2,7 @@ package seq
 
 import (
 	"context"
-	"gather"
+	"github.com/jaredmtdev/gather"
 	"iter"
 )
 

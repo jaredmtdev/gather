@@ -1,11 +1,12 @@
+```
   _____       _______ _    _ ______ _____  
  / ____|   /\|__   __| |  | |  ____|  __ \ 
 | |  __   /  \  | |  | |__| | |__  | |__) |
 | | |_ | / /\ \ | |  |  __  |  __| |  _  / 
 | |__| |/ ____ \| |  | |  | | |____| | \ \ 
  \_____/_/    \_\_|  |_|  |_|______|_|  \_\
-
-<img alt="gather logo" src="gatherlogo.png" />
+ ```
+ <img src="gatherlogo.jpg" alt="gather logo" width="200" />
 
 Gather is a lightweight channel-based concurrency library for Go.
 It helps you build **worker pools, pipelines, and middleware**.
@@ -33,7 +34,9 @@ for v := range out {
 
 ## Install
 
-`go get github.com/???/gather`
+```
+go get github.com/jaredmtdev/gather
+```
 
 ## API at a glance
 

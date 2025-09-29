@@ -8,7 +8,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	"gather"
+	"github.com/jaredmtdev/gather"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

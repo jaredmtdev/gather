@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"errors"
-	"gather"
-	"gather/examples/internal/samplemiddleware"
+	"github.com/jaredmtdev/gather"
+	"github.com/jaredmtdev/gather/examples/internal/samplemiddleware"
 	"math/rand"
 	"time"
 )

@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"gather"
+	"github.com/jaredmtdev/gather"
 )
 
 type number interface {
