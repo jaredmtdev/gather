@@ -1,4 +1,11 @@
-# Gather
+  _____       _______ _    _ ______ _____  
+ / ____|   /\|__   __| |  | |  ____|  __ \ 
+| |  __   /  \  | |  | |__| | |__  | |__) |
+| | |_ | / /\ \ | |  |  __  |  __| |  _  / 
+| |__| |/ ____ \| |  | |  | | |____| | \ \ 
+ \_____/_/    \_\_|  |_|  |_|______|_|  \_\
+
+<img alt="gather logo" src="gatherlogo.png" />
 
 Gather is a lightweight channel-based concurrency library for Go.
 It helps you build **worker pools, pipelines, and middleware**.
