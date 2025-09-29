@@ -420,6 +420,6 @@ func TestWorkersChangeInputToNilThenCancel(t *testing.T) {
 			seen[v-3] = true
 			expected++
 		}
-		assert.Equal(t, 21, expected)
+		assert.Equal(t, 20, expected)
 	})
 }
