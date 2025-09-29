@@ -8,8 +8,8 @@ package main
 import (
 	"context"
 	"fmt"
-	"gather"
-	"gather/internal/seq"
+	"github.com/jaredmtdev/gather"
+	"github.com/jaredmtdev/gather/internal/seq"
 	"slices"
 )
 

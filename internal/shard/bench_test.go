@@ -3,8 +3,8 @@ package shard_test
 import (
 	"context"
 	"fmt"
-	"gather"
-	"gather/internal/shard"
+	"github.com/jaredmtdev/gather"
+	"github.com/jaredmtdev/gather/internal/shard"
 	"sync"
 	"testing"
 )
