@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
-	"gather"
-	"gather/examples/internal/samplegen"
-	"gather/examples/internal/samplemiddleware"
+	"github.com/jaredmtdev/gather"
+	"github.com/jaredmtdev/gather/examples/internal/samplegen"
+	"github.com/jaredmtdev/gather/examples/internal/samplemiddleware"
 	"math/rand"
 	"time"
 )

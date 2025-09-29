@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"gather/internal/syncvalue"
+	"github.com/jaredmtdev/gather/internal/syncvalue"
 )
 
 // Scope - gives the user some ability to do things that require internal mechanisms.

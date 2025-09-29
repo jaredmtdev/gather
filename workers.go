@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"gather/internal/syncvalue"
+	"github.com/jaredmtdev/gather/internal/syncvalue"
 )
 
 // workerOpts - configures behavior of Workers.
@@ -214,7 +214,7 @@ func Workers[IN any, OUT any](ctx context.Context, in <-chan IN, handler Handler
 
 	if in == nil {
 		if ws.panicOnNil {
-			panic("gather.Workers: nil input channel")
+			panic("github.com/jaredmtdev/gather.Workers: nil input channel")
 		}
 		close(ws.out)
 		return ws.out

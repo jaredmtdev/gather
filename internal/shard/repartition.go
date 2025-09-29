@@ -2,7 +2,7 @@ package shard
 
 import (
 	"context"
-	"gather/internal/op"
+	"github.com/jaredmtdev/gather/internal/op"
 	"sync"
 )
 

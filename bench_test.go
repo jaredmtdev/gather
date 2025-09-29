@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"gather"
+	"github.com/jaredmtdev/gather"
 )
 
 /*

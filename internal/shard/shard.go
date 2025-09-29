@@ -2,7 +2,7 @@ package shard
 
 import (
 	"context"
-	"gather"
+	"github.com/jaredmtdev/gather"
 )
 
 // Apply - applies sharding: each shard is a pool of gather.Workers

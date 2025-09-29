@@ -2,7 +2,7 @@ package seq_test
 
 import (
 	"context"
-	"gather/internal/seq"
+	"github.com/jaredmtdev/gather/internal/seq"
 	"iter"
 	"sync"
 	"testing"
