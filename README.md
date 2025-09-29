@@ -34,7 +34,9 @@ for v := range out {
 
 ## Install
 
-`go get github.com/???/gather`
+```
+go get github.com/jaredmtdev/gather
+```
 
 ## API at a glance
 
