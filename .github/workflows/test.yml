@@ -17,10 +17,13 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+      - name: go env
+        run: go env
       - name: Run Go tests
         run: go test -race -v `go list ./... | grep -v 'examples'` -coverprofile=coverage.out
       - name: Check Coverage
         run: |
+          go tool cover -func coverage.out
           coverage=$(go tool cover -func coverage.out | tail -1 | awk '{ print $3; }')
-          echo $coverage
+          echo "total coverage: $coverage"
           [[ $coverage != "100.0%" ]] && exit 1
