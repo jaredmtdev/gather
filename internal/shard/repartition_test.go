@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/jaredmtdev/gather/internal/shard"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -208,15 +207,10 @@ func TestRepartitionOneToManyEarlyCancel(t *testing.T) {
 			select {
 			case <-ctx.Done():
 				return
-			default:
-			}
-			select {
-			case <-ctx.Done():
-				return
 			case in <- i:
 				if i == 30 {
 					cancel()
-					//return
+					return
 				}
 			}
 		}

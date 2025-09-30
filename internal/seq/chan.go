@@ -6,7 +6,7 @@ import (
 	"sync"
 )
 
-// ToChan - iter.Seq to chan
+// ToChan - iter.Seq to chan.
 func ToChan[T any](ctx context.Context, in iter.Seq[T], buffer int) <-chan T {
 	out := make(chan T, buffer)
 	go func() {
@@ -22,7 +22,7 @@ func ToChan[T any](ctx context.Context, in iter.Seq[T], buffer int) <-chan T {
 	return out
 }
 
-// ToChans - slice of iter.Seqs to slice of channels
+// ToChans - slice of iter.Seqs to slice of channels.
 func ToChans[T any](ctx context.Context, ins []iter.Seq[T], buffer int) []<-chan T {
 	outs := make([]<-chan T, len(ins))
 	wg := sync.WaitGroup{}
@@ -46,7 +46,7 @@ func ToChans[T any](ctx context.Context, ins []iter.Seq[T], buffer int) []<-chan
 	return outs
 }
 
-// FromChan - chan to iter.Seq
+// FromChan - chan to iter.Seq.
 func FromChan[T any](ctx context.Context, in <-chan T) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for {
@@ -62,7 +62,7 @@ func FromChan[T any](ctx context.Context, in <-chan T) iter.Seq[T] {
 	}
 }
 
-// FromChans - slice of channels to slice of iter.Seq
+// FromChans - slice of channels to slice of iter.Seq.
 func FromChans[T any](ctx context.Context, ins []<-chan T) []iter.Seq[T] {
 	outs := make([]iter.Seq[T], len(ins))
 	for i, in := range ins {

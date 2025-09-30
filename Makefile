@@ -18,11 +18,11 @@ testx: ## Run unit tests multiple times.
 
 .PHONY: lint
 lint: ## Show linting issues.
-	golangci-lint run .
+	golangci-lint run ./...
 
 .PHONY: lint-fix
 lint-fix: ## Attempt to fix linting issues.
-	golangci-lint run --fix .
+	golangci-lint run --fix ./...
 
 .PHONY: coverage
 coverage: ## Show coverage in html.
