@@ -207,14 +207,10 @@ func TestRepartitionOneToManyEarlyCancel(t *testing.T) {
 			select {
 			case <-ctx.Done():
 				return
-			default:
-			}
-			select {
-			case <-ctx.Done():
-				return
 			case in <- i:
 				if i == 30 {
 					cancel()
+					return
 				}
 			}
 		}
