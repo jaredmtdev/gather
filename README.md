@@ -32,7 +32,7 @@ for v := range out {
 }
 ```
 
-## Install
+## Add to your project
 
 ```
 go get github.com/jaredmtdev/gather
