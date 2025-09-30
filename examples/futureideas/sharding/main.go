@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"fmt"
+
 	"github.com/jaredmtdev/gather"
 	"github.com/jaredmtdev/gather/internal/shard"
 )
@@ -18,7 +19,7 @@ func main() {
 	workerOpts := []gather.Opt{
 		gather.WithWorkerSize(workerSizePerShard),
 		gather.WithBufferSize(workerBuffer),
-		//gather.WithOrderPreserved(),
+		// gather.WithOrderPreserved(),
 	}
 
 	ctx := context.Background()
@@ -55,15 +56,15 @@ func main() {
 	fmt.Println("")
 
 	//// any order
-	//wgShard := sync.WaitGroup{}
-	//for i, shard := range outs2 {
+	// wgShard := sync.WaitGroup{}
+	// for i, shard := range outs2 {
 	//	wgShard.Go(func() {
 	//		for v := range shard {
 	//			fmt.Printf("shard %v: %v\n", i, v)
 	//		}
 	//	})
 	//}
-	//wgShard.Wait()
+	// wgShard.Wait()
 
 	//	// preserve order via round robin
 	//	var done bool

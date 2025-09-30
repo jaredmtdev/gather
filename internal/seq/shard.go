@@ -2,13 +2,14 @@ package seq
 
 import (
 	"context"
+	"iter"
+
 	"github.com/jaredmtdev/gather"
 	"github.com/jaredmtdev/gather/internal/shard"
-	"iter"
 )
 
 // Shards - integrates shard.Apply using iter.Seq in place of channels
-// by default, shards will use the same buffer as the input
+// by default, shards will use the same buffer as the input.
 func Shards[IN, OUT any](
 	ctx context.Context,
 	ins []iter.Seq[IN],

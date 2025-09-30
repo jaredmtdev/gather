@@ -2,12 +2,12 @@ package seq_test
 
 import (
 	"context"
-	"github.com/jaredmtdev/gather"
-	"github.com/jaredmtdev/gather/internal/seq"
 	"slices"
 	"strings"
 	"testing"
 
+	"github.com/jaredmtdev/gather"
+	"github.com/jaredmtdev/gather/internal/seq"
 	"github.com/stretchr/testify/assert"
 )
 

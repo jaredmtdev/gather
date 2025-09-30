@@ -2,11 +2,11 @@ package seq_test
 
 import (
 	"context"
-	"github.com/jaredmtdev/gather/internal/seq"
 	"iter"
 	"sync"
 	"testing"
 
+	"github.com/jaredmtdev/gather/internal/seq"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -93,18 +93,16 @@ func TestToChans(t *testing.T) {
 func TestToChansBreakEarly(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	in := func() iter.Seq[int] {
-		return func(yield func(v int) bool) {
-			for i := range 10 {
-				if !yield(i) {
-					return
-				}
+	var in iter.Seq[int] = func(yield func(v int) bool) {
+		for i := range 10 {
+			if !yield(i) {
+				return
 			}
 		}
 	}
 	ins := make([]iter.Seq[int], 10)
 	for i := range ins {
-		ins[i] = in()
+		ins[i] = in
 	}
 
 	outs := seq.ToChans(ctx, ins, 3)
@@ -165,11 +163,7 @@ func TestFromChanBreakEarly(t *testing.T) {
 	go func() {
 		defer close(in)
 		for i := range 20 {
-			select {
-			case <-ctx.Done():
-				return
-			case in <- i:
-			}
+			in <- i
 		}
 	}()
 	inSeq := seq.FromChan(ctx, in)
@@ -202,16 +196,14 @@ func TestFromChanEarlyCancelFromGenerator(t *testing.T) {
 	in := make(chan int)
 	go func() {
 		defer close(in)
-		for i := range 20 {
-			if i >= 10 {
-				cancel()
-			}
+		for i := range 10 {
 			select {
 			case <-ctx.Done():
 				return
 			case in <- i:
 			}
 		}
+		cancel()
 	}()
 	inSeq := seq.FromChan(ctx, in)
 	wg := sync.WaitGroup{}
@@ -231,6 +223,23 @@ func TestFromChanEarlyCancelFromGenerator(t *testing.T) {
 		} else {
 			assert.False(t, v)
 		}
+	}
+}
+
+func assertOutputOnTestFromChans(t *testing.T, s int, insSeq []iter.Seq[int]) {
+	seen := make([]bool, 20)
+	wgInner := sync.WaitGroup{}
+	for range 3 {
+		wgInner.Go(func() {
+			for v := range insSeq[s] {
+				assert.False(t, seen[v])
+				seen[v] = true
+			}
+		})
+	}
+	wgInner.Wait()
+	for i := range 20 {
+		require.True(t, seen[i])
 	}
 }
 
@@ -261,23 +270,34 @@ func TestFromChans(t *testing.T) {
 	// each seq should be able to be processed by multiple workers
 	for s := range 5 {
 		wg.Go(func() {
-			seen := make([]bool, 20)
-			wgInner := sync.WaitGroup{}
-			for range 3 {
-				wgInner.Go(func() {
-					for v := range insSeq[s] {
-						assert.False(t, seen[v])
-						seen[v] = true
-					}
-				})
-			}
-			wgInner.Wait()
-			for i := range 20 {
-				require.True(t, seen[i])
-			}
+			assertOutputOnTestFromChans(t, s, insSeq)
 		})
 	}
 	wg.Wait()
+}
+
+func assertOutputOnTestFromChansBreakEarly(t *testing.T, s int, insSeq []iter.Seq[int]) {
+	seen := make([]bool, 20)
+	wgInner := sync.WaitGroup{}
+	for range 3 {
+		wgInner.Go(func() {
+			for v := range insSeq[s] {
+				assert.False(t, seen[v])
+				seen[v] = true
+				if v >= 10 {
+					break
+				}
+			}
+		})
+	}
+	wgInner.Wait()
+	for i := range 20 {
+		if i < 10+3 {
+			require.True(t, seen[i])
+		} else {
+			require.False(t, seen[i])
+		}
+	}
 }
 
 func TestFromChansBreakEarly(t *testing.T) {
@@ -307,30 +327,34 @@ func TestFromChansBreakEarly(t *testing.T) {
 	// each seq should be able to be processed by multiple workers
 	for s := range 5 {
 		wg.Go(func() {
-			seen := make([]bool, 20)
-			wgInner := sync.WaitGroup{}
-			for range 3 {
-				wgInner.Go(func() {
-					for v := range insSeq[s] {
-						assert.False(t, seen[v])
-						seen[v] = true
-						if v >= 10 {
-							break
-						}
-					}
-				})
-			}
-			wgInner.Wait()
-			for i := range 20 {
-				if i < 10+3 {
-					require.True(t, seen[i])
-				} else {
-					require.False(t, seen[i])
-				}
-			}
+			assertOutputOnTestFromChansBreakEarly(t, s, insSeq)
 		})
 	}
 	wg.Wait()
+}
+
+func assertOutputOnTestFromChansCancelEarlyFromGenerator(t *testing.T, s int, insSeq []iter.Seq[int]) {
+	seen := make([]bool, 20)
+	wgInner := sync.WaitGroup{}
+	for range 3 {
+		wgInner.Go(func() {
+			for v := range insSeq[s] {
+				assert.False(t, seen[v])
+				seen[v] = true
+			}
+		})
+	}
+	wgInner.Wait()
+	var trueCount int
+	for i := range 20 {
+		if i >= 10 {
+			assert.False(t, seen[i], i)
+		}
+		if seen[i] {
+			trueCount++
+		}
+	}
+	assert.LessOrEqual(t, trueCount, 10)
 }
 
 func TestFromChansCancelEarlyFromGenerator(t *testing.T) {
@@ -364,27 +388,7 @@ func TestFromChansCancelEarlyFromGenerator(t *testing.T) {
 	// each seq should be able to be processed by multiple workers
 	for s := range 5 {
 		wg.Go(func() {
-			seen := make([]bool, 20)
-			wgInner := sync.WaitGroup{}
-			for range 3 {
-				wgInner.Go(func() {
-					for v := range insSeq[s] {
-						assert.False(t, seen[v])
-						seen[v] = true
-					}
-				})
-			}
-			wgInner.Wait()
-			var trueCount int
-			for i := range 20 {
-				if i >= 10 {
-					assert.False(t, seen[i], i)
-				}
-				if seen[i] {
-					trueCount++
-				}
-			}
-			assert.LessOrEqual(t, trueCount, 10)
+			assertOutputOnTestFromChansCancelEarlyFromGenerator(t, s, insSeq)
 		})
 	}
 	wg.Wait()

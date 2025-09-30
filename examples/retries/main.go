@@ -3,10 +3,11 @@ package main
 import (
 	"context"
 	"errors"
-	"github.com/jaredmtdev/gather"
-	"github.com/jaredmtdev/gather/examples/internal/samplemiddleware"
 	"math/rand"
 	"time"
+
+	"github.com/jaredmtdev/gather"
+	"github.com/jaredmtdev/gather/examples/internal/samplemiddleware"
 )
 
 type Job struct {
@@ -14,18 +15,20 @@ type Job struct {
 	Retries int
 }
 
+var ErrOops = errors.New("oops")
+
 func shouldRetryUntilMax(maxRetries int) func(Job) (Job, bool) {
 	return func(job Job) (Job, bool) {
 		if job.Retries >= maxRetries {
 			return job, false
 		}
-		job.Retries += 1
+		job.Retries++
 		return job, true
 	}
 }
 
 func tripple() gather.HandlerFunc[Job, int] {
-	return func(ctx context.Context, job Job, scope *gather.Scope[Job]) (int, error) {
+	return func(ctx context.Context, job Job, _ *gather.Scope[Job]) (int, error) {
 		// simulate work
 		select {
 		case <-ctx.Done():
@@ -37,7 +40,7 @@ func tripple() gather.HandlerFunc[Job, int] {
 		if rand.Intn(2) == 1 {
 			return job.Value * 3, nil
 		}
-		return 0, errors.New("oops!")
+		return 0, ErrOops
 	}
 }
 

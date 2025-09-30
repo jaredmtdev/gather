@@ -3,17 +3,18 @@ package main
 import (
 	"context"
 	"fmt"
+	"math/rand"
+	"time"
+
 	"github.com/jaredmtdev/gather"
 	"github.com/jaredmtdev/gather/examples/internal/samplegen"
 	"github.com/jaredmtdev/gather/examples/internal/samplemiddleware"
-	"math/rand"
-	"time"
 )
 
 func main() {
 	mw := samplemiddleware.Logger[int, int]("INFO", "ERROR")
 	addHandler := func(num int) gather.HandlerFunc[int, int] {
-		return func(ctx context.Context, in int, scope *gather.Scope[int]) (int, error) {
+		return func(ctx context.Context, in int, _ *gather.Scope[int]) (int, error) {
 			select {
 			case <-time.After(time.Duration(rand.Intn(200)) * time.Millisecond):
 			case <-ctx.Done():

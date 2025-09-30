@@ -2,13 +2,13 @@ package seq_test
 
 import (
 	"context"
-	"github.com/jaredmtdev/gather"
-	"github.com/jaredmtdev/gather/internal/seq"
 	"iter"
 	"strings"
 	"sync"
 	"testing"
 
+	"github.com/jaredmtdev/gather"
+	"github.com/jaredmtdev/gather/internal/seq"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -51,6 +51,33 @@ func TestShards(t *testing.T) {
 	wg.Wait()
 }
 
+func assertOutputOnTestShardsEarlyBreak(t *testing.T, workers int, i int, out iter.Seq[string]) {
+	letters := "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	seen := make([]bool, 26)
+	wgInner := sync.WaitGroup{}
+	for range workers {
+		wgInner.Go(func() {
+			for v := range out {
+				assert.Contains(t, letters, v, v, i)
+				ind := int(v[0] - 'A')
+				assert.False(t, seen[ind])
+				seen[ind] = true
+				if ind >= 10 {
+					break
+				}
+			}
+		})
+	}
+	wgInner.Wait()
+	for i := range seen {
+		if i < 10+3 {
+			assert.True(t, seen[i], i)
+		} else {
+			assert.False(t, seen[i], i)
+		}
+	}
+}
+
 func TestShardsEarlyBreak(t *testing.T) {
 	ctx := context.Background()
 	buffer := 1
@@ -67,30 +94,7 @@ func TestShardsEarlyBreak(t *testing.T) {
 	wg := sync.WaitGroup{}
 	for i, out := range outs {
 		wg.Go(func() {
-			letters := "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-			seen := make([]bool, 26)
-			wgInner := sync.WaitGroup{}
-			for range workers {
-				wgInner.Go(func() {
-					for v := range out {
-						assert.Contains(t, letters, v, v, i)
-						ind := int(v[0] - 'A')
-						assert.False(t, seen[ind])
-						seen[ind] = true
-						if ind >= 10 {
-							break
-						}
-					}
-				})
-			}
-			wgInner.Wait()
-			for i := range seen {
-				if i < 10+3 {
-					assert.True(t, seen[i], i)
-				} else {
-					assert.False(t, seen[i], i)
-				}
-			}
+			assertOutputOnTestShardsEarlyBreak(t, workers, i, out)
 		})
 	}
 	wg.Wait()
