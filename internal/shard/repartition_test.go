@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 	"testing"
+	"testing/synctest"
 
 	"github.com/jaredmtdev/gather/internal/shard"
 	"github.com/stretchr/testify/assert"
@@ -233,33 +234,108 @@ func TestRepartitionOneToManyEarlyCancel(t *testing.T) {
 }
 
 func TestRepartitionOneToOneEarlyCancelDuringRepartition(t *testing.T) {
-	// send to in chan and then block from being able to send to out chan
+	synctest.Test(t, func(t *testing.T) {
+		// send to in chan and then block from being able to send to out chan
+		// then cancel
+		in := make(chan int)
+		sent := make(chan struct{})
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		defer close(in)
+		go func() {
+			in <- 1
+			close(sent)
+		}()
+		outs := shard.Repartition[int](1).WithBuffer(0).Apply(ctx, in)
+		require.Len(t, outs, 1)
+		out := outs[0]
+		require.Equal(t, 0, cap(out))
+		<-sent
+		cancel()
+		synctest.Wait()
+		var got int
+		for range out {
+			got++
+		}
+		assert.Empty(t, got)
+	})
+}
+
+func TestRepartitionOneToOneEarlyCancelWhileReceiving(t *testing.T) {
+	// cancel just before sending
 	in := make(chan int)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go func() {
-		defer close(in)
-		for i := range 2 {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
-			select {
-			case <-ctx.Done():
-			case in <- i + 1:
-			}
-		}
-	}()
 	outs := shard.Repartition[int](1).WithBuffer(0).Apply(ctx, in)
+	cancel()
 	require.Len(t, outs, 1)
 	out := outs[0]
 	require.Equal(t, 0, cap(out))
-	cancel()
 	var got int
 	for v := range out {
 		assert.Equal(t, 1, v)
 		got++
 	}
-	assert.LessOrEqual(t, got, 1)
+	assert.Equal(t, 0, got)
+}
+
+func generatorsForTestRepartitionOneToManyMultipleGeneratorsHardCancel(ctx context.Context) <-chan int {
+	queue := make(chan int)
+	jobs := 1000
+	generators := 5
+	var wgGen sync.WaitGroup
+	for g := range generators {
+		wgGen.Go(func() {
+			for i := g; i < jobs; i += generators {
+				select {
+				case <-ctx.Done():
+					return
+				case queue <- i:
+				}
+			}
+		})
+	}
+
+	go func() {
+		wgGen.Wait()
+		close(queue)
+	}()
+	return queue
+}
+func TestRepartitionOneToManyMultipleGeneratorsHardCancel(t *testing.T) {
+	cutoff := 100
+	in := make(chan int)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	queue := generatorsForTestRepartitionOneToManyMultipleGeneratorsHardCancel(ctx)
+
+	// hard cutoff gate
+	go func() {
+		// deliberately NOT closing in chan
+		// repartition should still successfully exit after cancel
+		for v := range queue {
+			if v >= cutoff {
+				cancel()
+				return
+			}
+			in <- v
+		}
+	}()
+
+	outs := shard.Repartition[int](3).WithBuffer(0).Apply(ctx, in)
+	require.Len(t, outs, 3)
+
+	wg := sync.WaitGroup{}
+	for _, out := range outs {
+		wg.Go(func() {
+			var got int
+			for v := range out {
+				assert.Less(t, v, cutoff)
+				got++
+			}
+			assert.Less(t, got, cutoff)
+		})
+	}
+	wg.Wait()
 }

@@ -10,7 +10,7 @@ help: ## Show this help message.
 
 .PHONY: test
 test: ## Run unit tests.
-	go test -race -coverprofile=coverage.out `go list ./... | grep -v 'examples'`
+	go test -race -shuffle=on -count=1 -coverprofile=coverage.out `go list ./... | grep -v 'examples'`
 
 .PHONY: testx
 testx: ## Run unit tests multiple times.

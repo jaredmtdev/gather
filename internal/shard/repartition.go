@@ -17,6 +17,8 @@ type Repartitioner[T any] struct {
 	partitionSize int
 	bufferSize    *int
 	route         RouteFunc[T]
+	outsSendTo    []chan T
+	outsResponse  []<-chan T
 }
 
 // WithBuffer - option to set new buffer size. by default will choose same buffer as input data.
@@ -32,6 +34,29 @@ func (r *Repartitioner[T]) WithRoute(route RouteFunc[T]) *Repartitioner[T] {
 	return r
 }
 
+func (r *Repartitioner[T]) repartitionShard(ctx context.Context, inShard int, in <-chan T) {
+	var outShard int
+	var value T
+	for job := 0; ; job++ {
+		select {
+		case <-ctx.Done():
+			return
+		case v, ok := <-in:
+			if !ok {
+				return
+			}
+			outShard = op.PosMod(r.route(inShard, job, v), r.partitionSize)
+			value = v
+		}
+
+		select {
+		case <-ctx.Done():
+			return
+		case r.outsSendTo[outShard] <- value:
+		}
+	}
+}
+
 // Apply - runs the repartition.
 func (r *Repartitioner[T]) Apply(ctx context.Context, ins ...<-chan T) []<-chan T {
 	if len(ins) == 0 {
@@ -42,37 +67,28 @@ func (r *Repartitioner[T]) Apply(ctx context.Context, ins ...<-chan T) []<-chan 
 		r.bufferSize = &bufferSize
 	}
 
-	outsResponse := make([]<-chan T, r.partitionSize)
-	outsSendTo := make([]chan T, r.partitionSize)
-	for i := range outsResponse {
-		outsSendTo[i] = make(chan T, *r.bufferSize)
-		outsResponse[i] = outsSendTo[i]
+	r.outsResponse = make([]<-chan T, r.partitionSize)
+	r.outsSendTo = make([]chan T, r.partitionSize)
+	for i := range r.outsResponse {
+		r.outsSendTo[i] = make(chan T, *r.bufferSize)
+		r.outsResponse[i] = r.outsSendTo[i]
 	}
 
 	wgInShard := sync.WaitGroup{}
 	for inShard, in := range ins {
 		wgInShard.Go(func() {
-			job := 0
-			for v := range in {
-				outShard := op.PosMod(r.route(inShard, job, v), r.partitionSize)
-				job++
-				select {
-				case <-ctx.Done():
-					return
-				case outsSendTo[outShard] <- v:
-				}
-			}
+			r.repartitionShard(ctx, inShard, in)
 		})
 	}
 
 	go func() {
 		wgInShard.Wait()
-		for i := range outsSendTo {
-			close(outsSendTo[i])
+		for i := range r.outsSendTo {
+			close(r.outsSendTo[i])
 		}
 	}()
 
-	return outsResponse
+	return r.outsResponse
 }
 
 // Repartition - configure a repartition
