@@ -379,6 +379,7 @@ func TestScopeRetryThenGo(t *testing.T) {
 }
 
 func TestOrderedWorkersAndScopeRetryThenGo(t *testing.T) {
+	seed := time.Now().UnixNano()
 	synctest.Test(t, func(t *testing.T) {
 		ctx := context.Background()
 		totalAttempts := atomic.Int32{}
@@ -390,7 +391,7 @@ func TestOrderedWorkersAndScopeRetryThenGo(t *testing.T) {
 			gather.WithOrderPreserved(),
 		}
 
-		mw := mwRandomDelay[int, int](time.Now().UnixNano(), 0, time.Second)
+		mw := mwRandomDelay[int, int](seed, 0, time.Second)
 
 		handler := gather.HandlerFunc[int, int](func(ctx context.Context, in int, scope *gather.Scope[int]) (int, error) {
 			totalAttempts.Add(1)
