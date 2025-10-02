@@ -194,14 +194,10 @@ func TestFromChanEarlyCancelFromGenerator(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	in := make(chan int)
+	defer close(in)
 	go func() {
-		defer close(in)
 		for i := range 10 {
-			select {
-			case <-ctx.Done():
-				return
-			case in <- i:
-			}
+			in <- i
 		}
 		cancel()
 	}()

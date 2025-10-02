@@ -236,33 +236,25 @@ func TestRepartitionOneToOneEarlyCancelDuringRepartition(t *testing.T) {
 	// send to in chan and then block from being able to send to out chan
 	// then cancel
 	in := make(chan int)
+	sent := make(chan struct{})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go func() {
 		defer close(in)
-		for i := range 2 {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
-			select {
-			case <-ctx.Done():
-			case in <- i + 1:
-			}
-		}
+		in <- 1
+		close(sent)
 	}()
 	outs := shard.Repartition[int](1).WithBuffer(0).Apply(ctx, in)
 	require.Len(t, outs, 1)
 	out := outs[0]
 	require.Equal(t, 0, cap(out))
+	<-sent
 	cancel()
 	var got int
-	for v := range out {
-		assert.Equal(t, 1, v)
+	for range out {
 		got++
 	}
-	assert.LessOrEqual(t, got, 1)
+	assert.Empty(t, got)
 }
 
 func TestRepartitionOneToOneEarlyCancelWhileReceiving(t *testing.T) {
