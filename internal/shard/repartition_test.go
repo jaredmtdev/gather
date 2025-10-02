@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 	"testing"
+	"testing/synctest"
 
 	"github.com/jaredmtdev/gather/internal/shard"
 	"github.com/stretchr/testify/assert"
@@ -233,28 +234,32 @@ func TestRepartitionOneToManyEarlyCancel(t *testing.T) {
 }
 
 func TestRepartitionOneToOneEarlyCancelDuringRepartition(t *testing.T) {
-	// send to in chan and then block from being able to send to out chan
-	// then cancel
-	in := make(chan int)
-	sent := make(chan struct{})
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go func() {
+	synctest.Test(t, func(t *testing.T) {
+		// send to in chan and then block from being able to send to out chan
+		// then cancel
+		in := make(chan int)
+		sent := make(chan struct{})
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		defer close(in)
-		in <- 1
-		close(sent)
-	}()
-	outs := shard.Repartition[int](1).WithBuffer(0).Apply(ctx, in)
-	require.Len(t, outs, 1)
-	out := outs[0]
-	require.Equal(t, 0, cap(out))
-	<-sent
-	cancel()
-	var got int
-	for range out {
-		got++
-	}
-	assert.Empty(t, got)
+		go func() {
+			in <- 1
+			close(sent)
+		}()
+		outs := shard.Repartition[int](1).WithBuffer(0).Apply(ctx, in)
+		require.Len(t, outs, 1)
+		out := outs[0]
+		require.Equal(t, 0, cap(out))
+		<-sent
+		cancel()
+		//time.Sleep(2 * time.Second)
+		synctest.Wait()
+		var got int
+		for range out {
+			got++
+		}
+		assert.Empty(t, got)
+	})
 }
 
 func TestRepartitionOneToOneEarlyCancelWhileReceiving(t *testing.T) {

@@ -1,0 +1,10 @@
+#!/bin/bash
+
+while true
+do
+  #make test
+  go test -shuffle=on -count=1 -coverprofile=coverage.out `go list ./... | grep -v 'examples'`
+  coverage=$(go tool cover -func=coverage.out | tail -1 | awk '{ print $3; }')
+  [[ $coverage == "100.0%" ]] || exit 0
+done
+

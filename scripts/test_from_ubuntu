@@ -4,7 +4,6 @@
 
 test_command='
 go test -race -coverprofile=coverage.out `go list ./... | grep -v "examples"`
-go tool cover -html=coverage.out -o coverage.html
 '
 # docker run --rm \
 #   -v "$PWD":/work -w /work \
