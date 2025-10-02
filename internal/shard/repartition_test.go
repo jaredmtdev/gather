@@ -252,7 +252,6 @@ func TestRepartitionOneToOneEarlyCancelDuringRepartition(t *testing.T) {
 		require.Equal(t, 0, cap(out))
 		<-sent
 		cancel()
-		//time.Sleep(2 * time.Second)
 		synctest.Wait()
 		var got int
 		for range out {
