@@ -5,6 +5,7 @@ import (
 	"iter"
 	"sync"
 	"testing"
+	"testing/synctest"
 
 	"github.com/jaredmtdev/gather/internal/seq"
 	"github.com/stretchr/testify/assert"
@@ -34,30 +35,33 @@ func TestToChan(t *testing.T) {
 }
 
 func TestToChanBreakEarly(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	in := func() iter.Seq[int] {
-		return func(yield func(v int) bool) {
-			for i := range 10 {
-				if !yield(i) {
-					return
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		in := func() iter.Seq[int] {
+			return func(yield func(v int) bool) {
+				for i := range 10 {
+					if !yield(i) {
+						return
+					}
 				}
 			}
 		}
-	}
 
-	out := seq.ToChan(ctx, in(), 3)
-	assert.Equal(t, 3, cap(out))
-	var got int
-	for v := range out {
-		require.Equal(t, got, v)
-		got++
-		if got >= 5 {
-			cancel()
-			break
+		out := seq.ToChan(ctx, in(), 0)
+		assert.Equal(t, 0, cap(out))
+		var got int
+		for v := range out {
+			require.Equal(t, got, v)
+			got++
+			if got == 5 {
+				cancel()
+				synctest.Wait()
+			}
 		}
-	}
-	assert.Equal(t, 5, got)
+
+		assert.Equal(t, 5, got)
+	})
 }
 
 func TestToChans(t *testing.T) {
@@ -105,10 +109,10 @@ func TestToChansBreakEarly(t *testing.T) {
 		ins[i] = in
 	}
 
-	outs := seq.ToChans(ctx, ins, 3)
+	outs := seq.ToChans(ctx, ins, 0)
 	assert.Len(t, outs, 10)
 
-	assert.Equal(t, 3, cap(outs[0]))
+	assert.Equal(t, 0, cap(outs[0]))
 	wg := sync.WaitGroup{}
 	for out := range outs {
 		wg.Go(func() {
