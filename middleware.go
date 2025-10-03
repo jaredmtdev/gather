@@ -22,7 +22,7 @@ type Middleware[IN any, OUT any] func(next HandlerFunc[IN, OUT]) HandlerFunc[IN,
 
 // Chain middleware together in FIFO execution order.
 //
-// Chain(m1,m2)(h) == m1(m2(h))
+// Chain(m1,m2,m3)(h) == m1(m2(m3(h)))
 func Chain[IN any, OUT any](mws ...Middleware[IN, OUT]) Middleware[IN, OUT] {
 	return func(h HandlerFunc[IN, OUT]) HandlerFunc[IN, OUT] {
 		for _, mw := range slices.Backward(mws) {

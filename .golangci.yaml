@@ -119,6 +119,9 @@ linters:
       text: "Use of weak random number generator"
     - path: ^examples/
       linters: [forbidigo]
+    - path: middleware.go
+      linters: [godot]
+      source: '\)\)$'
       
 
   disable:
