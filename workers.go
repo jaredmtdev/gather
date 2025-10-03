@@ -17,7 +17,10 @@ type workerOpts struct {
 // Opt - options used to configure Workers.
 type Opt func(w *workerOpts)
 
-// WithWorkerSize - set number of concurrent workers.
+// WithWorkerSize - set the number of concurrent workers.
+// Each worker consumes one job at a time.
+//
+// Uses 1 by default.
 func WithWorkerSize(workerSize int) Opt {
 	if workerSize <= 0 {
 		panic(fmt.Sprintf("must use at least 1 worker! workerSize: %v", workerSize))
@@ -27,7 +30,9 @@ func WithWorkerSize(workerSize int) Opt {
 	}
 }
 
-// WithBufferSize - set buffer size for the internal and output channel.
+// WithBufferSize - set buffer size for the internal and output channels.
+//
+// Uses unbuffered channels by default.
 func WithBufferSize(bufferSize int) Opt {
 	if bufferSize < 0 {
 		panic(fmt.Sprintf("buffer must be at least 0! bufferSize: %v", bufferSize))
@@ -38,7 +43,7 @@ func WithBufferSize(bufferSize int) Opt {
 }
 
 // WithOrderPreserved - preserves order of input to output
-// the workers will keep running but results are blocked from sending until the "next" result is ready to send.
+// the workers will keep running but results are blocked from sending to out until the "next" result is ready to send.
 func WithOrderPreserved() Opt {
 	return func(w *workerOpts) {
 		w.orderPreserved = true
@@ -46,7 +51,7 @@ func WithOrderPreserved() Opt {
 }
 
 // WithPanicOnNilChannel - option to panic when a nil channel is sent to Workers
-// by default, Workers will immediately close the out channel and return.
+// By default, Workers will immediately close the out channel and return.
 func WithPanicOnNilChannel() Opt {
 	return func(w *workerOpts) {
 		w.panicOnNil = true
@@ -63,7 +68,7 @@ func newWorkerOpts(opts []Opt) *workerOpts {
 	return wo
 }
 
-// workerStation - internal functionality used by Workers.
+// workerStation - provides context for Workers.
 type workerStation[IN, OUT any] struct {
 	*workerOpts
 
@@ -74,7 +79,8 @@ type workerStation[IN, OUT any] struct {
 	handler HandlerFunc[IN, OUT]
 }
 
-// job - keeps track of index for optional ordered results.
+// job - wraps around incoming and outgoing data (val) to track job metadata.
+// used primarily for tracking order of each job.
 type job[T any] struct {
 	index uint64
 	val   T
@@ -128,7 +134,7 @@ func (ws *workerStation[IN, OUT]) buildReenqueueFunc(ctx context.Context, index 
 	}
 }
 
-// SendResult - sends result from worker to the next step (either out or reorder).
+// SendResult - sends result from worker to the next step (either out or reorder gate).
 func (ws *workerStation[IN, OUT]) SendResult(ctx context.Context, jobOut job[OUT], err error) {
 	defer ws.wgJob.Done()
 	if ws.orderPreserved {
@@ -170,8 +176,8 @@ func (ws *workerStation[IN, OUT]) StartWorker(ctx context.Context) {
 	}
 }
 
-// Reorder - used to cache the result until the "next" result is cached and ready to be sent to out chan
-// in other words: reorder to make sure all results are sent in the same order of their inputs.
+// Reorder - gate used to cache the result until the "next" result is cached and ready to be sent to out chan.
+// makes sure all results are sent to out chan in the same order it was received from in chan.
 func (ws *workerStation[IN, OUT]) Reorder(ctx context.Context) {
 	var nextJobOutIndex uint64
 	jobOutCache := map[uint64]job[OUT]{}
@@ -197,8 +203,33 @@ func (ws *workerStation[IN, OUT]) Reorder(ctx context.Context) {
 	}
 }
 
-// Workers - build a single pipeline stage based on the handler and options.
-func Workers[IN any, OUT any](ctx context.Context, in <-chan IN, handler HandlerFunc[IN, OUT], opts ...Opt) <-chan OUT {
+// Workers starts multiple goroutines that read jobs from in,
+// process them with handler, and forward results to out. It returns out.
+//
+// Concurrency and resource use:
+//   - Spawns N worker goroutines (configured with opts)
+//     plus a small, constant number of internal coordinators
+//     (O(1)). No goroutines are created per job.
+//   - Backpressure is applied by the capacities of in/out (unbuffered channels block).
+//   - buffer size of internal and out channels can be configured with opts
+//
+// Lifecycle:
+//   - When in is closed and all jobs are drained/processed, out is closed.
+//   - If ctx is canceled, workers stop early and out is closed after in-flight jobs exit.
+//   - the out channel MUST be drained to avoid a deadlock.
+//
+// Ordering:
+//   - By default, results are NOT guaranteed to preserve input order.
+//   - Use opts to configure to guarantee preserved order.
+//
+// Errors:
+//   - If handler returns an error, the job is NOT sent to out.
+func Workers[IN any, OUT any](
+	ctx context.Context,
+	in <-chan IN,
+	handler HandlerFunc[IN, OUT],
+	opts ...Opt,
+) <-chan OUT {
 	ws := &workerStation[IN, OUT]{
 		workerOpts: newWorkerOpts(opts),
 		handler:    handler,
@@ -211,7 +242,7 @@ func Workers[IN any, OUT any](ctx context.Context, in <-chan IN, handler Handler
 
 	if in == nil {
 		if ws.panicOnNil {
-			panic("github.com/jaredmtdev/gather.Workers: nil input channel")
+			panic("gather.Workers: nil input channel")
 		}
 		close(ws.out)
 		return ws.out
