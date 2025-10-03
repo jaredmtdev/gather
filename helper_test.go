@@ -127,3 +127,16 @@ func mwCancelOnCount[IN any, OUT any](cancelOn int32, cancel context.CancelFunc)
 		}
 	}
 }
+
+// mwId is used for checking order of middleware.
+func mwId[IN, OUT any](id int, order chan int) gather.Middleware[IN, OUT] {
+	return func(next gather.HandlerFunc[IN, OUT]) gather.HandlerFunc[IN, OUT] {
+		return func(ctx context.Context, in IN, scope *gather.Scope[IN]) (OUT, error) {
+			select {
+			case <-ctx.Done():
+			case order <- id:
+			}
+			return next(ctx, in, scope)
+		}
+	}
+}
