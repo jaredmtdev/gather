@@ -3,16 +3,15 @@ package gather
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
-
-	"github.com/jaredmtdev/gather/internal/syncvalue"
 )
 
 // Scope - gives the user some ability to do things that require internal mechanisms.
 type Scope[IN any] struct {
 	reenqueue   func(IN)
 	willRetry   bool
-	retryClosed *syncvalue.Value[bool]
+	retryClosed atomic.Bool
 	once        *sync.Once
 	wgJob       *sync.WaitGroup
 }

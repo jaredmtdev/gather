@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-
-	"github.com/jaredmtdev/gather/internal/syncvalue"
 )
 
 // workerOpts - configures behavior of Workers.
@@ -159,10 +157,9 @@ func (ws *workerStation[IN, OUT]) StartWorker(ctx context.Context) {
 		default:
 		}
 		scope := Scope[IN]{
-			reenqueue:   ws.buildReenqueueFunc(ctx, jobIn.index),
-			wgJob:       &ws.wgJob,
-			once:        &sync.Once{},
-			retryClosed: &syncvalue.Value[bool]{},
+			reenqueue: ws.buildReenqueueFunc(ctx, jobIn.index),
+			wgJob:     &ws.wgJob,
+			once:      &sync.Once{},
 		}
 
 		res, err := ws.handler(ctx, jobIn.val, &scope)
