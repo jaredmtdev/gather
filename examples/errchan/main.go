@@ -19,7 +19,7 @@ import (
 func main() {
 	errCh := make(chan error)
 	addHandler := func(num int) gather.HandlerFunc[int, int] {
-		return func(ctx context.Context, in int, _ *gather.Scope[int]) (int, error) {
+		return func(ctx context.Context, in int, scope *gather.Scope[int]) (int, error) {
 			select {
 			case <-time.After(time.Duration(rand.Intn(200)) * time.Millisecond):
 			case <-ctx.Done():
@@ -27,10 +27,12 @@ func main() {
 			}
 			if in == 15 || in == 16 {
 				err := errs.NewErrInvalidNumber(in)
-				select {
-				case <-ctx.Done():
-				case errCh <- err:
-				}
+				scope.Go(func() {
+					select {
+					case <-ctx.Done():
+					case errCh <- err:
+					}
+				})
 				return 0, err
 			}
 			return num + in, nil

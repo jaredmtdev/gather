@@ -58,6 +58,7 @@ func TestApplyWithNoBuffer(t *testing.T) {
 	wgGen.Wait()
 	outs := shard.Apply(ctx, ins, handler(), gather.WithBufferSize(0))
 	assert.Len(t, outs, 5)
+
 	var total atomic.Int32
 	wg := sync.WaitGroup{}
 	for _, out := range outs {

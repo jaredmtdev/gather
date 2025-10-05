@@ -35,11 +35,17 @@ func main() {
 				case <-time.After(125 * time.Millisecond):
 				}
 			}
+
+			// uncomment to test early cancel
 			// if in == 10 {
 			// 	cancel()
 			// }
+
+			// example of scope.Go
 			if in == 7 {
 				scope.Go(func() {
+					// this executes while the worker moves on to a different job
+					// it is "safe" in that the worker will not shut down until this task completes
 					time.Sleep(2 * time.Second)
 					fmt.Println("safely executed from new go routine!")
 				})

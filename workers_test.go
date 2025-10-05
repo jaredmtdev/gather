@@ -236,13 +236,14 @@ func TestWorkersOrdered(t *testing.T) {
 }
 
 func TestWorkersOrderedWithEarlyCancel(t *testing.T) {
+	seed := time.Now().UnixNano()
 	synctest.Test(t, func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
 		mw := gather.Chain(
 			mwCancelOnInput[int, int](20, cancel),
-			mwRandomDelay[int, int](time.Now().UnixNano(), 0, time.Second),
+			mwRandomDelay[int, int](seed, 0, time.Second),
 		)
 		opts := []gather.Opt{
 			gather.WithWorkerSize(5),
@@ -328,7 +329,6 @@ func TestPipelineOrdered(t *testing.T) {
 }
 
 func TestPipelineOrderedWithEarlyCancelAtFirstStage(t *testing.T) {
-	// synctest.Test(t, func(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -352,7 +352,6 @@ func TestPipelineOrderedWithEarlyCancelAtFirstStage(t *testing.T) {
 		got++
 	}
 	assert.Less(t, got, 5)
-	// })
 }
 
 func TestWorkersInvalidBuffer(t *testing.T) {

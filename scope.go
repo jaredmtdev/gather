@@ -3,26 +3,25 @@ package gather
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
-
-	"github.com/jaredmtdev/gather/internal/syncvalue"
 )
 
-// Scope - gives the user some ability to do things that require internal mechanisms.
+// Scope - a per-request utility passed to handlers and middleware.
 type Scope[IN any] struct {
 	reenqueue   func(IN)
 	willRetry   bool
-	retryClosed *syncvalue.Value[bool]
+	retryClosed atomic.Bool
 	once        *sync.Once
 	wgJob       *sync.WaitGroup
 }
 
-// RetryAfter - retry the request after "after" time passes.
+// RetryAfter - retry the request after "delay" time passes.
 // only one retry can be done at a time for each job.
 // any extra retries will be ignored.
-func (s *Scope[IN]) RetryAfter(ctx context.Context, in IN, after time.Duration) {
+func (s *Scope[IN]) RetryAfter(ctx context.Context, in IN, delay time.Duration) {
 	if s.retryClosed.Load() {
-		panic("Invalid attempt to retry. Retries can only be executed BEFORE spawning new go routines.")
+		panic("Invalid attempt to retry. Retries can only be executed BEFORE spawning new go routines with scope.Go.")
 	}
 	s.once.Do(func() {
 		s.willRetry = true
@@ -30,7 +29,7 @@ func (s *Scope[IN]) RetryAfter(ctx context.Context, in IN, after time.Duration) 
 			select {
 			case <-ctx.Done():
 				s.wgJob.Done()
-			case <-time.After(after):
+			case <-time.After(delay):
 				s.reenqueue(in)
 			}
 		})

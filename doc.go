@@ -1,2 +1,2 @@
-// Package gather - lightweight package that glues gather all concurrency patterns.
+// Package gather - used to create worker pools, pipelines, and middleware
 package gather

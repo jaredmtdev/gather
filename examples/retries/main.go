@@ -1,3 +1,7 @@
+/*
+This example shows how scope.RetryAfter can be utilized by a middleware to
+implement a retry logic with max retries.
+*/
 package main
 
 import (
@@ -10,15 +14,15 @@ import (
 	"github.com/jaredmtdev/gather/examples/internal/samplemiddleware"
 )
 
-type Job struct {
-	Value   int
+type Job[T any] struct {
+	Value   T
 	Retries int
 }
 
 var ErrOops = errors.New("oops")
 
-func shouldRetryUntilMax(maxRetries int) func(Job) (Job, bool) {
-	return func(job Job) (Job, bool) {
+func shouldRetryUntilMax[T any](maxRetries int) func(Job[T]) (Job[T], bool) {
+	return func(job Job[T]) (Job[T], bool) {
 		if job.Retries >= maxRetries {
 			return job, false
 		}
@@ -27,8 +31,8 @@ func shouldRetryUntilMax(maxRetries int) func(Job) (Job, bool) {
 	}
 }
 
-func tripple() gather.HandlerFunc[Job, int] {
-	return func(ctx context.Context, job Job, _ *gather.Scope[Job]) (int, error) {
+func tripple() gather.HandlerFunc[Job[int], int] {
+	return func(ctx context.Context, job Job[int], _ *gather.Scope[Job[int]]) (int, error) {
 		// simulate work
 		select {
 		case <-ctx.Done():
@@ -46,14 +50,14 @@ func tripple() gather.HandlerFunc[Job, int] {
 
 func main() {
 	mw := gather.Chain(
-		samplemiddleware.RetryAfter[Job, int](200*time.Millisecond, shouldRetryUntilMax(3)),
-		samplemiddleware.Logger[Job, int]("INFO", "ERROR"),
+		samplemiddleware.RetryAfter[Job[int], int](200*time.Millisecond, shouldRetryUntilMax[int](3)),
+		samplemiddleware.Logger[Job[int], int]("INFO", "ERROR"),
 	)
 
-	in := make(chan Job)
+	in := make(chan Job[int])
 	go func() {
 		for i := range 30 {
-			in <- Job{Value: i}
+			in <- Job[int]{Value: i}
 		}
 		close(in)
 	}()
