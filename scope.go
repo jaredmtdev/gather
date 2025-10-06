@@ -15,8 +15,11 @@ type Scope[IN any] struct {
 }
 
 // RetryAfter - retry the request after "delay" time passes.
-// only one retry can be done at a time for each job.
-// any extra retries will be ignored.
+//
+// Only one retry can be done at a time for each job.
+// Any extra retries will be ignored.
+//
+// Retries must be executed directly in the handler (not from other goroutines).
 func (s *Scope[IN]) RetryAfter(ctx context.Context, in IN, delay time.Duration) {
 	s.once.Do(func() {
 		s.willRetry = true
