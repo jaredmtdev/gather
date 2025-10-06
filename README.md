@@ -42,7 +42,7 @@ go get github.com/jaredmtdev/gather
 
 - Workers: start a worker pool that consumes an input channel and returns an output channel
 - HandlerFunc: handles each job
-- Scope: tools available to a handler (retries, safe go routines, etc)
+- Scope: tools available to a handler (i.e. retries)
 - Middleware: wrap handlers and other middleware
 - Chain: chains multiple middleware
 

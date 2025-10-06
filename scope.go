@@ -3,26 +3,24 @@ package gather
 import (
 	"context"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
 // Scope - a per-request utility passed to handlers and middleware.
 type Scope[IN any] struct {
-	reenqueue   func(IN)
-	willRetry   bool
-	retryClosed atomic.Bool
-	once        *sync.Once
-	wgJob       *sync.WaitGroup
+	reenqueue func(IN)
+	willRetry bool
+	once      sync.Once
+	wgJob     *sync.WaitGroup
 }
 
 // RetryAfter - retry the request after "delay" time passes.
-// only one retry can be done at a time for each job.
-// any extra retries will be ignored.
+//
+// Only one retry can be done at a time for each job.
+// Any extra retries will be ignored.
+//
+// Retries must be executed directly in the handler (not from other goroutines).
 func (s *Scope[IN]) RetryAfter(ctx context.Context, in IN, delay time.Duration) {
-	if s.retryClosed.Load() {
-		panic("Invalid attempt to retry. Retries can only be executed BEFORE spawning new go routines with scope.Go.")
-	}
 	s.once.Do(func() {
 		s.willRetry = true
 		s.wgJob.Go(func() {
@@ -39,11 +37,4 @@ func (s *Scope[IN]) RetryAfter(ctx context.Context, in IN, delay time.Duration) 
 // Retry - will retry immediately.
 func (s *Scope[IN]) Retry(ctx context.Context, in IN) {
 	s.RetryAfter(ctx, in, 0)
-}
-
-// Go - allow your handler to safely spin up a new go routine (in addition to the worker go routine).
-// the worker will not shut down while this go routine is running.
-func (s *Scope[IN]) Go(f func()) {
-	s.retryClosed.Store(true)
-	s.wgJob.Go(f)
 }

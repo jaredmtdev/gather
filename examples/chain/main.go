@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"sync"
 	"time"
 
 	"github.com/jaredmtdev/gather"
@@ -20,8 +21,9 @@ func main() {
 	)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	wg := sync.WaitGroup{}
 	addHandler := func(num int) gather.HandlerFunc[int, int] {
-		return func(ctx context.Context, in int, scope *gather.Scope[int]) (int, error) {
+		return func(ctx context.Context, in int, _ *gather.Scope[int]) (int, error) {
 			select {
 			case <-time.After(time.Duration(rand.Intn(200)) * time.Millisecond):
 			case <-ctx.Done():
@@ -41,11 +43,8 @@ func main() {
 			// 	cancel()
 			// }
 
-			// example of scope.Go
 			if in == 7 {
-				scope.Go(func() {
-					// this executes while the worker moves on to a different job
-					// it is "safe" in that the worker will not shut down until this task completes
+				wg.Go(func() {
 					time.Sleep(2 * time.Second)
 					fmt.Println("safely executed from new go routine!")
 				})
@@ -61,6 +60,7 @@ func main() {
 
 	for range gather.Workers(ctx, samplegen.Range(40), mw(addHandler(3)), opts...) {
 	}
+	wg.Wait()
 	fmt.Println("done!")
 	time.Sleep(time.Second)
 	fmt.Println("shutting down")

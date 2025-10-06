@@ -165,7 +165,6 @@ func (ws *workerStation[IN, OUT]) StartWorker(ctx context.Context) {
 		scope := Scope[IN]{
 			reenqueue: ws.buildReenqueueFunc(ctx, jobIn.index),
 			wgJob:     &ws.wgJob,
-			once:      &sync.Once{},
 		}
 
 		res, err := ws.handler(ctx, jobIn.val, &scope)

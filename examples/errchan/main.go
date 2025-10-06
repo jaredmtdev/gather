@@ -18,8 +18,9 @@ import (
 
 func main() {
 	errCh := make(chan error)
+	wg := sync.WaitGroup{}
 	addHandler := func(num int) gather.HandlerFunc[int, int] {
-		return func(ctx context.Context, in int, scope *gather.Scope[int]) (int, error) {
+		return func(ctx context.Context, in int, _ *gather.Scope[int]) (int, error) {
 			select {
 			case <-time.After(time.Duration(rand.Intn(200)) * time.Millisecond):
 			case <-ctx.Done():
@@ -27,7 +28,7 @@ func main() {
 			}
 			if in == 15 || in == 16 {
 				err := errs.NewErrInvalidNumber(in)
-				scope.Go(func() {
+				wg.Go(func() {
 					select {
 					case <-ctx.Done():
 					case errCh <- err:
@@ -55,6 +56,7 @@ func main() {
 	for v := range gather.Workers(ctx, out2, addHandler(3), gather.WithWorkerSize(2), gather.WithBufferSize(2)) {
 		fmt.Printf("%v ", v)
 	}
+	wg.Wait()
 	close(errCh)
 	wgErrs.Wait()
 	fmt.Printf("\nerrors: %v\n", errs)
