@@ -12,6 +12,7 @@
 
  [![Test Status](https://img.shields.io/github/actions/workflow/status/jaredmtdev/gather/test.yml?branch=main&logo=GitHub&label=test)](https://github.com/jaredmtdev/gather/actions/workflows/test.yml?query=branch%3Amain)
  [![Go Report Card](https://goreportcard.com/badge/github.com/jaredmtdev/gather)](https://goreportcard.com/report/github.com/jaredmtdev/gather)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/jaredmtdev/gather/badge)](https://scorecard.dev/viewer/?uri=github.com/jaredmtdev/gather)
 
 </div>
 
