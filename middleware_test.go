@@ -9,6 +9,8 @@ import (
 )
 
 func TestChainOrderFIFO(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	jobs := 100
 	order := make(chan int, jobs*2)
@@ -26,6 +28,8 @@ func TestChainOrderFIFO(t *testing.T) {
 }
 
 func TestManualChainOrderFIFO(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	jobs := 100
 	order := make(chan int, jobs*2)

@@ -10,11 +10,11 @@ help: ## Show this help message.
 
 .PHONY: test
 test: ## Run unit tests.
-	go test -race -shuffle=on -count=1 -coverprofile=coverage.out `go list ./... | grep -v 'examples'`
+	go test -race -p 1 -parallel 2 -shuffle=on -count=1 -coverprofile=coverage.out `go list ./... | grep -v 'examples'`
 
 .PHONY: testx
 testx: ## Run unit tests multiple times.
-	go test -v -count=1000 `go list ./... | grep -v 'examples'` -timeout=30s
+	go test -v -count=1000 `go list ./... | grep -v 'examples'` -failfast -timeout=30s -p 1 -parallel 2
 
 .PHONY: lint
 lint: ## Show linting issues.

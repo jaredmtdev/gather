@@ -163,6 +163,8 @@ func TestRepartitionWithRoute(t *testing.T) {
 }
 
 func TestRepartitionWithNoInputShards(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	panicCh := make(chan any, 1)
 	wg := sync.WaitGroup{}
@@ -180,6 +182,8 @@ func TestRepartitionWithNoInputShards(t *testing.T) {
 }
 
 func TestRepartitionWithNoPartitions(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	panicCh := make(chan any, 1)
 	in := make(chan int)
@@ -234,6 +238,8 @@ func TestRepartitionOneToManyEarlyCancel(t *testing.T) {
 }
 
 func TestRepartitionOneToOneEarlyCancelDuringRepartition(t *testing.T) {
+	t.Parallel()
+
 	synctest.Test(t, func(t *testing.T) {
 		// send to in chan and then block from being able to send to out chan
 		// then cancel
@@ -262,6 +268,8 @@ func TestRepartitionOneToOneEarlyCancelDuringRepartition(t *testing.T) {
 }
 
 func TestRepartitionOneToOneEarlyCancelWhileReceiving(t *testing.T) {
+	t.Parallel()
+
 	// cancel just before sending
 	in := make(chan int)
 	ctx, cancel := context.WithCancel(context.Background())
