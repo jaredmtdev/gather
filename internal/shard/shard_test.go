@@ -20,12 +20,10 @@ func TestApply(t *testing.T) {
 		inCh <- 1
 		close(inCh)
 	}
-	handler := func() gather.HandlerFunc[int, int] {
-		return func(_ context.Context, in int, _ *gather.Scope[int]) (int, error) {
-			return in, nil
-		}
+	var handler gather.HandlerFunc[int, int] = func(_ context.Context, in int, _ *gather.Scope[int]) (int, error) {
+		return in, nil
 	}
-	outs := shard.Apply(ctx, ins, handler())
+	outs := shard.Apply(ctx, ins, handler)
 	var total int
 	for _, out := range outs {
 		for v := range out {
@@ -50,13 +48,11 @@ func TestApplyWithNoBuffer(t *testing.T) {
 			close(inCh)
 		}()
 	}
-	handler := func() gather.HandlerFunc[int, int] {
-		return func(_ context.Context, in int, _ *gather.Scope[int]) (int, error) {
-			return in, nil
-		}
+	var handler gather.HandlerFunc[int, int] = func(_ context.Context, in int, _ *gather.Scope[int]) (int, error) {
+		return in, nil
 	}
 	wgGen.Wait()
-	outs := shard.Apply(ctx, ins, handler(), gather.WithBufferSize(0))
+	outs := shard.Apply(ctx, ins, handler, gather.WithBufferSize(0))
 	assert.Len(t, outs, 5)
 
 	var total atomic.Int32
@@ -87,13 +83,11 @@ func TestApplyWithMultipleWorkersAndNoBuffer(t *testing.T) {
 			close(inCh)
 		}()
 	}
-	handler := func() gather.HandlerFunc[int, int] {
-		return func(_ context.Context, in int, _ *gather.Scope[int]) (int, error) {
-			return in, nil
-		}
+	var handler gather.HandlerFunc[int, int] = func(_ context.Context, in int, _ *gather.Scope[int]) (int, error) {
+		return in, nil
 	}
 	wgGen.Wait()
-	outs := shard.Apply(ctx, ins, handler(), gather.WithBufferSize(0), gather.WithWorkerSize(2))
+	outs := shard.Apply(ctx, ins, handler, gather.WithBufferSize(0), gather.WithWorkerSize(2))
 	assert.Len(t, outs, 5)
 	var total atomic.Int32
 	wg := sync.WaitGroup{}

@@ -8,6 +8,8 @@ import (
 )
 
 func TestPosMod(t *testing.T) {
+	t.Parallel()
+
 	for i := -10; i < 20; i++ {
 		result := op.PosMod(i, 5)
 		assert.LessOrEqual(t, 0, result)

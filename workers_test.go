@@ -16,6 +16,8 @@ import (
 )
 
 func TestWorkersSynchronous(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	var got int
 	for v := range gather.Workers(ctx, gen(ctx, 200), add(3)) {
@@ -35,6 +37,8 @@ func TestWorkersSynchronousNilChan(t *testing.T) {
 }
 
 func TestWorkersSynchronousNilChanWithPanicOnNil(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	panicCh := make(chan any, 1)
 	var got int
@@ -56,6 +60,8 @@ func TestWorkersSynchronousNilChanWithPanicOnNil(t *testing.T) {
 }
 
 func TestWorkersSynchronousOrdered(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	opts := []gather.Opt{
 		gather.WithOrderPreserved(),
@@ -70,6 +76,8 @@ func TestWorkersSynchronousOrdered(t *testing.T) {
 }
 
 func TestWorkersSynchronousOrderedWithEarlyCancel(t *testing.T) {
+	t.Parallel()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -84,6 +92,8 @@ func TestWorkersSynchronousOrderedWithEarlyCancel(t *testing.T) {
 }
 
 func TestWorkersSynchronousWithInstantCancel(t *testing.T) {
+	t.Parallel()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -97,6 +107,8 @@ func TestWorkersSynchronousWithInstantCancel(t *testing.T) {
 }
 
 func TestWorkersSynchronousOrderedWithSomeErrors(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	handler := func() gather.HandlerFunc[int, int] {
@@ -121,6 +133,8 @@ func TestWorkersSynchronousOrderedWithSomeErrors(t *testing.T) {
 }
 
 func TestPipelineSynchronous(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	out1 := gather.Workers(ctx, gen(ctx, 20), add(3))
 	out2 := gather.Workers(ctx, out1, subtract(3))
@@ -133,6 +147,8 @@ func TestPipelineSynchronous(t *testing.T) {
 }
 
 func TestPipelineSynchronousWithMultipleTypes(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	out1 := gather.Workers(ctx, gen(ctx, 20), add(3))
 	out2 := gather.Workers(ctx, out1, convert[int, float64]())
@@ -147,6 +163,8 @@ func TestPipelineSynchronousWithMultipleTypes(t *testing.T) {
 }
 
 func TestPipelineSynchronousWithEarlyCancelAtLastStage(t *testing.T) {
+	t.Parallel()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -165,6 +183,8 @@ func TestPipelineSynchronousWithEarlyCancelAtLastStage(t *testing.T) {
 }
 
 func TestPipelineSynchronousWithEarlyCancelAtFirstStage(t *testing.T) {
+	t.Parallel()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

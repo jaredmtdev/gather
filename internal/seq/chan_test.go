@@ -13,18 +13,18 @@ import (
 )
 
 func TestToChan(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
-	in := func() iter.Seq[int] {
-		return func(yield func(v int) bool) {
-			for i := range 10 {
-				if !yield(i) {
-					return
-				}
+	var in iter.Seq[int] = func(yield func(v int) bool) {
+		for i := range 10 {
+			if !yield(i) {
+				return
 			}
 		}
 	}
 
-	out := seq.ToChan(ctx, in(), 3)
+	out := seq.ToChan(ctx, in, 3)
 	assert.Equal(t, 3, cap(out))
 	var got int
 	for v := range out {
@@ -35,20 +35,20 @@ func TestToChan(t *testing.T) {
 }
 
 func TestToChanBreakEarly(t *testing.T) {
+	t.Parallel()
+
 	synctest.Test(t, func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		in := func() iter.Seq[int] {
-			return func(yield func(v int) bool) {
-				for i := range 10 {
-					if !yield(i) {
-						return
-					}
+		var in iter.Seq[int] = func(yield func(v int) bool) {
+			for i := range 10 {
+				if !yield(i) {
+					return
 				}
 			}
 		}
 
-		out := seq.ToChan(ctx, in(), 0)
+		out := seq.ToChan(ctx, in, 0)
 		assert.Equal(t, 0, cap(out))
 		var got int
 		for v := range out {
@@ -66,18 +66,16 @@ func TestToChanBreakEarly(t *testing.T) {
 
 func TestToChans(t *testing.T) {
 	ctx := context.Background()
-	in := func() iter.Seq[int] {
-		return func(yield func(v int) bool) {
-			for i := range 10 {
-				if !yield(i) {
-					return
-				}
+	var in iter.Seq[int] = func(yield func(v int) bool) {
+		for i := range 10 {
+			if !yield(i) {
+				return
 			}
 		}
 	}
 	ins := make([]iter.Seq[int], 10)
 	for i := range ins {
-		ins[i] = in()
+		ins[i] = in
 	}
 
 	outs := seq.ToChans(ctx, ins, 3)

@@ -8,6 +8,9 @@
  </pre></div>
  <div align="center"><img src="gatherlogo.jpg" alt="gather logo" width="200" /></div>
 
+[![Test Status](https://img.shields.io/github/checks-status/jaredmtdev/gather/main?logo=GitHub&label=test)](https://github.com/jaredmtdev/gather/actions/workflows/test.yml?query=branch%3Amain)
+[![Go Report Card](https://goreportcard.com/badge/github.com/jaredmtdev/gather)](https://goreportcard.com/report/github.com/jaredmtdev/gather)
+
 Gather is a lightweight channel-based concurrency library for Go.
 It helps you build **worker pools, pipelines, and middleware**.
 
