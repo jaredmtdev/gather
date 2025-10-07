@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write #for codecov
 
 jobs:
   test:
@@ -35,3 +36,4 @@ jobs:
         with:
           files: coverage.out
           fail_ci_if_error: true
+          use_oidc: true
