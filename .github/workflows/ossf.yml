@@ -1,3 +1,4 @@
+name: Scorecard
 on:
   push:
     #branches:
@@ -15,6 +16,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: ossf/scorecard-action@2.4.3
+      - uses: ossf/scorecard-action@v2.4.3
         with:
           publish_results: true
