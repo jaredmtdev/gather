@@ -2,8 +2,10 @@
 
 To report a security issue, please email
 [gather-security@googlegroups.com](mailto:gather-security@googlegroups.com)
+or [report the vulnerability here](https://github.com/jaredmtdev/gather/security/advisories/new)
 with a description of the issue, the steps you took to create the issue,
 affected versions, and, if known, mitigations for the issue.
+
 
 Our vulnerability management team will respond within 7 working days of your
 email. If the issue is confirmed as a vulnerability, we will open a
