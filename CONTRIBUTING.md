@@ -34,7 +34,7 @@ others who are seeking help. Harassment of any kind will not be tolerated.
 - Run `make test` locally. CI must pass. We currently require **100% test coverage** for affected packages.
 - Preferred tests: single tests or table-driven tests. Optional: fuzz tests and benchmarks.
 
-### Quick steps to contribute
+## Quick steps to contribute
 
 1. Fork the project.
 1. Download your fork to your PC (`git clone https://github.com/your_username/gather && cd gather`)
