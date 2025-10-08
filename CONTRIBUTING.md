@@ -27,6 +27,13 @@ others who are seeking help. Harassment of any kind will not be tolerated.
    for the feature. Tests can be run via `make test`. 100% coverage is currently required.
 1. Since this is golang project, ensure the new code is properly formatted to ensure code consistency. Run `make lint-fix`.
 
+## Tests for New/Changed Functionality
+
+- When adding or changing functionality, include automated tests **in the same PR**.
+- Cover happy paths **and** error/edge cases (invalid input, timeouts, permission checks).
+- Run `make test` locally. CI must pass. We currently require **100% test coverage** for affected packages.
+- Preferred tests: single tests or table-driven tests. Optional: fuzz tests and benchmarks.
+
 ### Quick steps to contribute
 
 1. Fork the project.
