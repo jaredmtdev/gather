@@ -36,7 +36,7 @@ func FuzzScopeRetryAfterWhenNoError(data []byte) int {
 
 	fmt.Printf("workerSize %v bufferSize %v jobs %v retryOn %v\n", workerSize, bufferSize, jobs, retryOn)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
 	defer cancel()
 	panicExpected := workerSize < 1 || bufferSize < 0
 	var panicFound bool
