@@ -6,6 +6,7 @@ package fuzzgather
 import (
 	"context"
 	"encoding/binary"
+	"fmt"
 	"math"
 	"sync"
 	"sync/atomic"
@@ -28,6 +29,8 @@ func FuzzScopeRetryAfterWhenNoError(data []byte) int {
 
 	jobs = op.PosMod(jobs, 1_000_000)
 	retryOn = op.PosMod(retryOn, max(jobs, 1))
+
+	fmt.Printf("workerSize %v bufferSize %v jobs %v retryOn %v\n", workerSize, bufferSize, jobs, retryOn)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
