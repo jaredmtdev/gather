@@ -49,13 +49,6 @@ func FuzzScopeRetryAfterWhenNoError(data []byte) int {
 		return in * 2, nil
 	})
 
-	out := gather.Workers(ctx,
-		gen(ctx, jobs, max(bufferSize, 0)),
-		handler,
-		gather.WithWorkerSize(workerSize),
-		gather.WithBufferSize(bufferSize),
-	)
-
 	wg := sync.WaitGroup{}
 	wg.Go(func() {
 		defer func() {
@@ -67,6 +60,14 @@ func FuzzScopeRetryAfterWhenNoError(data []byte) int {
 				panic(r)
 			}
 		}()
+
+		out := gather.Workers(ctx,
+			gen(ctx, jobs, max(bufferSize, 0)),
+			handler,
+			gather.WithWorkerSize(workerSize),
+			gather.WithBufferSize(bufferSize),
+		)
+
 		for {
 			select {
 			case <-ctx.Done():
