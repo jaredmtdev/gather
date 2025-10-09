@@ -89,9 +89,7 @@ func FuzzScopeRetryAfterWhenNoError(data []byte) int {
 		panic("expected a panic. No panic occurred")
 	}
 
-	if ctx.Err() != nil {
-		return 0
-	}
+	// allow timeouts (long jobs) to occur and specify as interesting
 
 	return 1
 }
