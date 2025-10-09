@@ -1,0 +1,23 @@
+name: ClusterFuzzLite PR fuzzing
+on:
+  pull_request:
+    paths: ['**']
+
+permissions: read-all
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: google/clusterfuzzlite/actions/build_fuzzers@v1
+        with:
+          language: go
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: google/clusterfuzzlite/actions/run_fuzzers@v1
+        with:
+          language: go
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          fuzz-seconds: 120
+          mode: code-change
+          output-sarif: true
