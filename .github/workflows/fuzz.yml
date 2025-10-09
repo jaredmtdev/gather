@@ -2,6 +2,9 @@ name: ClusterFuzzLite PR fuzzing
 on:
   pull_request:
     paths: ['**']
+  schedule:
+    - cron: '0 6 * * *'   # daily at 06:00 UTC
+  workflow_dispatch:
 
 permissions: read-all
 
@@ -20,6 +23,6 @@ jobs:
         with:
           language: go
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          fuzz-seconds: 120
+          fuzz-seconds: 600
           mode: code-change
           output-sarif: true

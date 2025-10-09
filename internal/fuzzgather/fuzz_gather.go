@@ -30,7 +30,7 @@ func FuzzScopeRetryAfterWhenNoError(data []byte) int {
 	jobs = op.PosMod(jobs, 1_000_000)
 	retryOn = op.PosMod(retryOn, max(jobs, 1))
 
-	if bufferSize > 1_000_000 || workerSize > 1_000_000 || bufferSize < -50 || workerSize < -50 {
+	if bufferSize > 1_000_000 || workerSize > 1_000_000 || bufferSize < -200 || workerSize < -200 {
 		return 0
 	}
 
