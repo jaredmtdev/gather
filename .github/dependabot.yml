@@ -9,7 +9,7 @@ updates:
       time: "06:00"
     open-pull-requests-limit: 5
     commit-message:
-      prefix: "deps(gomod)"
+      prefix: "deps gomod"
     labels: ["dependencies", "gomod"]
 
   # github actions
@@ -21,6 +21,6 @@ updates:
       time: "06:00"
     open-pull-requests-limit: 5
     commit-message:
-      prefix: "deps(actions)"
-    labels: ["dependencies", "ci"]
+      prefix: "deps actions"
+    labels: ["dependencies"]
 
