@@ -16,6 +16,10 @@ test: ## Run unit tests.
 testx: ## Run unit tests multiple times.
 	go test -v -count=1000 `go list ./... | grep -v 'examples'` -failfast -timeout=30s -p 1 -parallel 2
 
+.PHONY: fuzz
+fuzz: ## Run fuzz tests to try to find edge cases.
+	go test -fuzz=Fuzz -fuzztime=5m -timeout=7m
+
 .PHONY: lint
 lint: ## Show linting issues.
 	golangci-lint run ./...
