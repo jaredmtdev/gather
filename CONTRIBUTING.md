@@ -25,7 +25,10 @@ others who are seeking help. Harassment of any kind will not be tolerated.
 
 1. Tests: If you are submitting code, please ensure you have adequate tests
    for the feature. Tests can be run via `make test`. 100% coverage is currently required.
-1. Since this is golang project, ensure the new code is properly formatted to ensure code consistency. Run `make lint-fix`.
+1. Since this is golang project, ensure the new code is properly formatted to ensure code consistency.
+   Run `make lint-fix`.
+1. Scope: keep the scope of the PR limited.
+   Better to break up to multiple PRs than to have 1 PR with multiple unrelated changes.
 
 ## Tests for New/Changed Functionality
 
