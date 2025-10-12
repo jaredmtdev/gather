@@ -1,0 +1,6 @@
+comment: false
+
+#coverage:
+#  status:
+#    project: off   # no repo-wide status checks from Codecov
+#    patch:   off   # no per-PR (patch) checks
