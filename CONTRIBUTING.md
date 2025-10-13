@@ -37,6 +37,19 @@ others who are seeking help. Harassment of any kind will not be tolerated.
 - Run `make test` locally. CI must pass. We currently require **100% test coverage** for affected packages.
 - Preferred tests: single tests or table-driven tests. Optional: fuzz tests and benchmarks.
 
+## Local Development
+
+Prerequisite: windows users will need to run all `make` commands from dev container (see below).
+
+Run `make test` to execute unit tests.
+
+Run `make help` to see all commands.
+
+### Containerized local environment
+
+- For windows: run `scripts/dev.ps1`
+- For mac/linux: run `scripts/dev`
+
 ## Quick steps to contribute
 
 1. Fork the project.
