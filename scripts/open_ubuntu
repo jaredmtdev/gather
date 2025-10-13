@@ -1,6 +1,6 @@
 #!/bin/zsh
 
-image_name=$(docker images --format json | jq -r '.Repository')
+image_name=$(docker images --format json | jq -r '.Repository' | grep "^ubuntu-go$")
 [[ $image_name == "ubuntu-go" ]] || docker build -f ./scripts/ubuntu.Dockerfile -t ubuntu-go .
 
 docker run -it --rm \

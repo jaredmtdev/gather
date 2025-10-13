@@ -17,6 +17,7 @@ ENV GOPATH=/go
 ENV PATH="${GOROOT}/bin:${GOPATH}/bin:${PATH}"
 ENV CGO_ENABLED=1
 
-WORKDIR /workspace
+#RUN go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@43d03392d7dc3746fa776dbddd66dfcccff70651 # v2.4.0
+#RUN go install golang.org/x/vuln/cmd/govulncheck@d1f380186385b4f64e00313f31743df8e4b89a77
 
 RUN go version
