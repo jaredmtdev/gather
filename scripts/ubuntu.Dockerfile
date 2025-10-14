@@ -17,6 +17,4 @@ ENV GOPATH=/go
 ENV PATH="${GOROOT}/bin:${GOPATH}/bin:${PATH}"
 ENV CGO_ENABLED=1
 
-WORKDIR /workspace
-
 RUN go version

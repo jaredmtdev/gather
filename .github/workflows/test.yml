@@ -13,7 +13,10 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Set up Go
@@ -23,8 +26,16 @@ jobs:
       - name: go env
         run: go env
       - name: Run Go tests
+        if: ${{ matrix.os != 'windows-latest' }}
         run: go test -race -v -p 1 -parallel 2 `go list ./... | grep -v 'examples'` -coverprofile=coverage.out
+      - name: Run Go tests for windows
+        if: ${{ matrix.os == 'windows-latest' }}
+        run: |
+          go test -race -v -p 1 -parallel 2 @(
+            go list ./... | Where-Object { $_ -notmatch 'examples' }
+          )
       - name: Check Coverage
+        if: ${{ matrix.os != 'windows-latest' }}
         run: |
           go tool cover -func coverage.out
           coverage=$(go tool cover -func coverage.out | tail -1 | awk '{ print $3; }')
@@ -32,6 +43,7 @@ jobs:
           [[ $coverage == "100.0%" ]] || exit 1
       - name: Codecov
         uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7 #v5.5.1
+        if: ${{ matrix.os == 'ubuntu-latest' }}
         with:
           files: coverage.out
           fail_ci_if_error: true
