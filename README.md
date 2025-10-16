@@ -91,7 +91,10 @@ or if you need pipeline semantics that errgroup and sync.WaitGroup don't give yo
 - 100% CPU-bound work -> use `sync.WaitGroup`
 - jobs that complete instantly
   - want minimal memory or simplicity -> use `iter` package
-  - if execution time is prioritized -> use multiple workers processing in batches
+  - if execution time is prioritized
+    - can avoid channels -> multiple workers processing in batches for best performance
+    - want decoupling/backpressure/middleware -> use `gather` with multiple workers + batches
+      - large enough batches can negate nearly all cost from channels
 - background task waiting to close a channel -> use plain goroutine
 - simple generator -> use plain goroutine or `iter.Seq`
 
