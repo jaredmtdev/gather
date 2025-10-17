@@ -110,7 +110,7 @@ func gen(ctx context.Context, jobs, buf int) <-chan int {
 }
 
 func decode(data []byte) int {
-	v, _ := binary.Varint(data)
+	v := int(int32(binary.LittleEndian.Uint32(data)))
 	if v > math.MaxInt {
 		v = v % math.MaxInt
 	} else if v < math.MinInt {
