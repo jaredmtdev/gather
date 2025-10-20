@@ -15,6 +15,7 @@
  [![Test Status](https://img.shields.io/github/actions/workflow/status/jaredmtdev/gather/test.yml?branch=main&logo=GitHub&label=test)](https://github.com/jaredmtdev/gather/actions/workflows/test.yml?query=branch%3Amain)
  [![Codecov](https://img.shields.io/codecov/c/github/jaredmtdev/gather?logo=codecov)](https://codecov.io/gh/jaredmtdev/gather)
  [![GitHub Release](https://img.shields.io/github/v/release/jaredmtdev/gather?label=version)](https://github.com/jaredmtdev/gather/releases)
+ [![Go Reference](https://pkg.go.dev/badge/github.com/jaredmtdev/gather.svg)](https://pkg.go.dev/github.com/jaredmtdev/gather)
 
 </div>
 
@@ -121,12 +122,12 @@ handler := func(ctx context.Context, in Foo, scope *gather.Scope[Foo]) (Bar, err
 }
 ```
 
-The `context` can be cancelled at any time to shut down the worker pool.
+The `ctx` parameter can be cancelled at any time to shut down the worker pool.
 Note that it's important for the handler to also honor any context cancellation for a quicker cancellation.
 
-The `in` variable can be any type and the response from the workerpool can be any type.
+The `in` parameter can be any type and the response from the workerpool can be any type.
 When returning an error, the result is not sent to the output channel.
-If needed, the error can also be sent to an error channel (which you create) and then processed in a separate go routine (which you define).
+If needed, the error can also be sent to an error channel (which you create) and then processed in a separate goroutine (which you define).
 The error response also comes in handy when building middleware.
 
 Optionally, make custom middleware to conveniently wrap around the handler:
@@ -134,23 +135,37 @@ Optionally, make custom middleware to conveniently wrap around the handler:
 ```go
 wrappedHandler := logger(retries(rateLimiter(handler)))
 
-// alternatively, chain the middleware:
+// alternatively, chain the middleware with Chain:
 mw := gather.Chain(rateLimiter, retries, logger)
 wrappedHandler := mw(handler)
 ```
 
-See `examples/internal/samplemiddleware/` for more detailed examples on building middleware.
+See [examples/internal/samplemiddleware/](/examples/internal/samplemiddleware/samplemiddleware.go) for more detailed examples on building middleware.
 
-The `scope` provides extra capabilities that may come in handy such as retries or spawning new go routines with a guaruntee that those go routines finish before the worker pool shuts down.
-
+The `scope` parameter provides extra capabilities to the handler such as retries.
 
 #### 2: Build your generator
 
-You need to have a channel of any type `<-chan T` which can only be received by the worker pool.
+You need to have a channel of any type and send data to it. Example:
+
+```go
+in := make(chan int)
+go func(){
+  defer close(in)
+  for i := range 100 {
+      select{
+          case <-ctx.Done():
+            return
+          case in <- i:
+      }
+  }
+}
+```
 
 #### 3: Configure and run the worker pool
 
 ```go
+opts = gather.WithWorkerSize(runtime.GOMAXPROCS(0))
 out := gather.Workers(ctx, in, handler, opts...) 
 ```
 
