@@ -1,3 +1,6 @@
+/*
+samplemiddleware - simple examples of middlewares that can be built to work with this library
+*/
 package samplemiddleware
 
 import (
@@ -8,10 +11,6 @@ import (
 
 	"github.com/jaredmtdev/gather"
 )
-
-/*
-simple examples of middlewares that can be built to work with this library
-*/
 
 // RetryAfter - retries after given time delay
 // by default, will always retry unless shouldRetry is defined.
