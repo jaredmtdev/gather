@@ -1,6 +1,6 @@
 /*
 This example is a pipeline where all 3 stages are sending errors to a separate error channel.
-This pattern might be useful to unblock workers while a separate go routine (or worker pool) prepares a list of errors for an api response.
+This pattern might be useful to unblock workers while a separate goroutine (or worker pool) prepares a list of errors for an api response.
 */
 package main
 

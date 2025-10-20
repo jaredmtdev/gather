@@ -127,7 +127,7 @@ Note that it's important for the handler to also honor any context cancellation 
 
 The `in` variable can be any type and the response from the workerpool can be any type.
 When returning an error, the result is not sent to the output channel.
-If needed, the error can also be sent to an error channel (which you create) and then processed in a separate go routine (which you define).
+If needed, the error can also be sent to an error channel (which you create) and then processed in a separate goroutine (which you define).
 The error response also comes in handy when building middleware.
 
 Optionally, make custom middleware to conveniently wrap around the handler:
@@ -135,15 +135,14 @@ Optionally, make custom middleware to conveniently wrap around the handler:
 ```go
 wrappedHandler := logger(retries(rateLimiter(handler)))
 
-// alternatively, chain the middleware:
+// alternatively, chain the middleware with Chain:
 mw := gather.Chain(rateLimiter, retries, logger)
 wrappedHandler := mw(handler)
 ```
 
 See `examples/internal/samplemiddleware/` for more detailed examples on building middleware.
 
-The `scope` provides extra capabilities to the handler which may come in handy such as retries.
-
+The `scope` parameter provides extra capabilities to the handler such as retries.
 
 #### 2: Build your generator
 

@@ -49,7 +49,7 @@ func main() {
 			if in == 7 {
 				wg.Go(func() {
 					time.Sleep(2 * time.Second)
-					fmt.Println("safely executed from new go routine!")
+					fmt.Println("safely executed from new goroutine!")
 				})
 			}
 			return num + in, nil
