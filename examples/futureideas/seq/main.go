@@ -1,7 +1,7 @@
 /*
-the seq package would allow you to work with gather without directly using channels
-below is an example of using a slice as input and then iterating through iter.Seq
-Note that you can break the loop any time without having to manually cancel the context or close any channel
+The seq package would allow you to work with gather without directly using channels.
+Below is an example of using a slice as input and then iterating through iter.Seq.
+Note that you can break the loop any time without having to manually cancel the context or close any channel.
 */
 package main
 

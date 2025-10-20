@@ -1,8 +1,7 @@
 /*
-This example shows how you can build more conveniences when input/output types are the same for all stages
-A reusable "Pipe" helper can be designed so that composing pipelines becomes very easy to do and readable
+This example shows how you can build more conveniences when input/output types are the same for all stages.
+A reusable "Pipe" helper can be designed so that composing pipelines becomes very easy to do and readable.
 */
-
 package main
 
 import (

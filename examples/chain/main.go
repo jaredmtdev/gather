@@ -1,3 +1,6 @@
+/*
+Example that shows how Chain can be used to chain multiple middleware.
+*/
 package main
 
 import (
