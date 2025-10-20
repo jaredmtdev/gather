@@ -1,4 +1,8 @@
-// this example shows how the experimental shard package can be used
+/*
+This example shows how the experimental shard package can be used.
+Sharding decouples work into separate channels and worker pools - putting less pressure on each channel.
+Sharding can give performance improvements in cases where there's a "hot channel".
+*/
 package main
 
 import (

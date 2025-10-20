@@ -1,6 +1,6 @@
 /*
-This example shows how scope.RetryAfter can be utilized by a middleware to
-implement a retry logic with max retries.
+This example shows how scope.RetryAfter can be utilized by a middleware to implement a retry logic with max retries.
+A real-world implementation would likely have much more options like exponential back-off, jitter, etc.
 */
 package main
 

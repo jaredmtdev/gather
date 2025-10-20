@@ -1,3 +1,7 @@
+/*
+A full example of what a pipeline can look like.
+This is as simple as sending the output of one worker pool into the next.
+*/
 package main
 
 import (
