@@ -15,6 +15,7 @@
  [![Test Status](https://img.shields.io/github/actions/workflow/status/jaredmtdev/gather/test.yml?branch=main&logo=GitHub&label=test)](https://github.com/jaredmtdev/gather/actions/workflows/test.yml?query=branch%3Amain)
  [![Codecov](https://img.shields.io/codecov/c/github/jaredmtdev/gather?logo=codecov)](https://codecov.io/gh/jaredmtdev/gather)
  [![GitHub Release](https://img.shields.io/github/v/release/jaredmtdev/gather?label=version)](https://github.com/jaredmtdev/gather/releases)
+ [![Go Reference](https://pkg.go.dev/badge/github.com/jaredmtdev/gather.svg)](https://pkg.go.dev/github.com/jaredmtdev/gather)
 
 </div>
 
@@ -141,12 +142,26 @@ wrappedHandler := mw(handler)
 
 See `examples/internal/samplemiddleware/` for more detailed examples on building middleware.
 
-The `scope` provides extra capabilities that may come in handy such as retries or spawning new go routines with a guaruntee that those go routines finish before the worker pool shuts down.
+The `scope` provides extra capabilities to the handler which may come in handy such as retries.
 
 
 #### 2: Build your generator
 
-You need to have a channel of any type `<-chan T` which can only be received by the worker pool.
+You need to have a channel of any type and send data to it. Example:
+
+```go
+in := make(chan int)
+go func(){
+  defer close(in)
+  for i := range 100 {
+      select{
+          case <-ctx.Done():
+            return
+          case in <- i:
+      }
+  }
+}
+```
 
 #### 3: Configure and run the worker pool
 
