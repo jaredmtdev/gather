@@ -5,7 +5,7 @@ import (
 	"slices"
 )
 
-// HandlerFunc - function used to handle a single request sent to a worker
+// HandlerFunc - function used to handle a single request sent to a worker.
 // Error handling is done here. user can:
 //   - cancel the context if needed for immediate shutdown
 //   - for graceful shutdown: user controls generator. can just close in chan and then let all downstream stages finish

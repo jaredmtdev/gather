@@ -42,15 +42,15 @@ func WithBufferSize(bufferSize int) Opt {
 	}
 }
 
-// WithOrderPreserved - preserves order of input to output
-// the workers will keep running but results are blocked from sending to out until the "next" result is ready to send.
+// WithOrderPreserved - preserves order of input to output.
+// The workers will keep running but results are blocked from sending to out until the "next" result is ready to send.
 func WithOrderPreserved() Opt {
 	return func(w *workerOpts) {
 		w.orderPreserved = true
 	}
 }
 
-// WithPanicOnNilChannel - option to panic when a nil channel is sent to Workers
+// WithPanicOnNilChannel - option to panic when a nil channel is sent to Workers.
 // By default, Workers will immediately close the out channel and return.
 func WithPanicOnNilChannel() Opt {
 	return func(w *workerOpts) {
@@ -202,27 +202,27 @@ func (ws *workerStation[IN, OUT]) Reorder(ctx context.Context) {
 	}
 }
 
-// Workers starts multiple goroutines that read jobs from in,
-// process them with handler, and forward results to out. It returns out.
+// Workers starts multiple goroutines that read jobs from `in`,
+// process them with handler, and forward results to `out`. It returns `out`.
 //
 // Concurrency and resource use:
-//   - Spawns N worker goroutines (configured with opts)
+//   - Spawns N worker goroutines (configured with `opts`)
 //     plus a small, constant number of internal coordinators
 //     (O(1)). No goroutines are created per job.
-//   - Backpressure is applied by the capacities of in/out (unbuffered channels block).
-//   - buffer size of internal and out channels can be configured with opts
+//   - Backpressure is applied by the capacities of `in`/`out` (unbuffered channels block).
+//   - Buffer size of internal and out channels can be configured with opts
 //
 // Lifecycle:
-//   - When in is closed and all jobs are drained/processed, out is closed.
-//   - If ctx is canceled, workers stop early and out is closed after in-flight jobs exit.
-//   - the out channel MUST be drained to avoid a deadlock.
+//   - When `in` is closed and all jobs are drained/processed, `out` is closed.
+//   - If `ctx` is canceled, workers stop early and out is closed after in-flight jobs exit.
+//   - The `out` channel MUST be drained to avoid a deadlock.
 //
 // Ordering:
 //   - By default, results are NOT guaranteed to preserve input order.
-//   - Use opts to configure to guarantee preserved order.
+//   - Use `opts` to configure to guarantee preserved order.
 //
 // Errors:
-//   - If handler returns an error, the job is NOT sent to out.
+//   - If handler returns an error, the job is NOT sent to `out`.
 func Workers[IN any, OUT any](
 	ctx context.Context,
 	in <-chan IN,

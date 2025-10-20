@@ -14,6 +14,7 @@
  [![OpenSSF Score](https://api.scorecard.dev/projects/github.com/jaredmtdev/gather/badge)](https://scorecard.dev/viewer/?uri=github.com/jaredmtdev/gather)
  [![Test Status](https://img.shields.io/github/actions/workflow/status/jaredmtdev/gather/test.yml?branch=main&logo=GitHub&label=test)](https://github.com/jaredmtdev/gather/actions/workflows/test.yml?query=branch%3Amain)
  [![Codecov](https://img.shields.io/codecov/c/github/jaredmtdev/gather?logo=codecov)](https://codecov.io/gh/jaredmtdev/gather)
+ [![GitHub Release](https://img.shields.io/github/v/release/jaredmtdev/gather?label=version)](https://github.com/jaredmtdev/gather/releases)
 
 </div>
 
@@ -54,6 +55,8 @@ go get github.com/jaredmtdev/gather
 - Scope: tools available to a handler (i.e. retries)
 - Middleware: wrap handlers and other middleware
 - Chain: chains multiple middleware
+
+More details [here](https://pkg.go.dev/github.com/jaredmtdev/gather).
 
 ## Design Philosophy
 
