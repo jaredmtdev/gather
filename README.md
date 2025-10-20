@@ -48,6 +48,11 @@ for v := range out {
 go get github.com/jaredmtdev/gather
 ```
 
+## Stability
+
+This project is pre-v1.0. The API may change between **minor** versions.
+We will guarantee SemVer versioning start from `v1.0.0`.
+
 ## API at a glance
 
 - Workers: start a worker pool that consumes an input channel and returns an output channel
