@@ -60,7 +60,7 @@ More details [here](https://pkg.go.dev/github.com/jaredmtdev/gather).
 
 ## Design Philosophy
 
-Gather provides the glue: workers, pipelines, and middleware.  
+Gather provides the glue: worker pools, pipelines, and a `Middleware` type.
 You design the concurrency patterns that fit your use case.
 
 ### Simple
