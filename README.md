@@ -122,10 +122,10 @@ handler := func(ctx context.Context, in Foo, scope *gather.Scope[Foo]) (Bar, err
 }
 ```
 
-The `context` can be cancelled at any time to shut down the worker pool.
+The `ctx` parameter can be cancelled at any time to shut down the worker pool.
 Note that it's important for the handler to also honor any context cancellation for a quicker cancellation.
 
-The `in` variable can be any type and the response from the workerpool can be any type.
+The `in` parameter can be any type and the response from the workerpool can be any type.
 When returning an error, the result is not sent to the output channel.
 If needed, the error can also be sent to an error channel (which you create) and then processed in a separate goroutine (which you define).
 The error response also comes in handy when building middleware.
@@ -140,7 +140,7 @@ mw := gather.Chain(rateLimiter, retries, logger)
 wrappedHandler := mw(handler)
 ```
 
-See `examples/internal/samplemiddleware/` for more detailed examples on building middleware.
+See [examples/internal/samplemiddleware/](/examples/internal/samplemiddleware/samplemiddleware.go) for more detailed examples on building middleware.
 
 The `scope` parameter provides extra capabilities to the handler such as retries.
 
@@ -165,6 +165,7 @@ go func(){
 #### 3: Configure and run the worker pool
 
 ```go
+opts = gather.WithWorkerSize(runtime.GOMAXPROCS(0))
 out := gather.Workers(ctx, in, handler, opts...) 
 ```
 
