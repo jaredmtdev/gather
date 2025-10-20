@@ -50,8 +50,8 @@ go get github.com/jaredmtdev/gather
 
 ## Stability
 
-This project is pre-v1.0. The API may change between **minor** versions.
-We will guarantee SemVer versioning start from `v1.0.0`.
+This project is currently pre-v1.0. The API may change between **minor** versions.
+We will guarantee SemVer versioning starting from `v1.0.0`.
 
 ## API at a glance
 
@@ -108,9 +108,9 @@ or if you need pipeline semantics that errgroup and sync.WaitGroup don't give yo
 
 ## Getting Started
 
-### building a worker pool
+### Building a worker pool
 
-#### 1: build your handler
+#### 1: Build your handler
 
 This handles each item sent to the worker pool
 
@@ -144,11 +144,11 @@ See `examples/internal/samplemiddleware/` for more detailed examples on building
 The `scope` provides extra capabilities that may come in handy such as retries or spawning new go routines with a guaruntee that those go routines finish before the worker pool shuts down.
 
 
-#### 2: build your generator
+#### 2: Build your generator
 
 You need to have a channel of any type `<-chan T` which can only be received by the worker pool.
 
-#### 3: configure and run the worker pool
+#### 3: Configure and run the worker pool
 
 ```go
 out := gather.Workers(ctx, in, handler, opts...) 
@@ -192,7 +192,7 @@ You could cancel at any stage to stop the entire pipeline.
 
 ### Examples
 
-Please see `examples/` folder for some simple examples.
+Please see [examples/](/examples/) folder for some simple examples.
 
 ## Future Ideas
 
