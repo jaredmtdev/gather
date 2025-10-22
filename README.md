@@ -165,7 +165,10 @@ go func(){
 #### 3: Configure and run the worker pool
 
 ```go
-opts = gather.WithWorkerSize(runtime.GOMAXPROCS(0))
+opts = []gather.Opt{
+    gather.WithWorkerSize(runtime.GOMAXPROCS(0)),
+    gather.WithBufferSize(1),
+}
 out := gather.Workers(ctx, in, handler, opts...) 
 ```
 
