@@ -213,4 +213,6 @@ Please see [examples/](/examples/) folder for some simple examples.
 
 - sharding across multiple channels
 - seq package: offer synchronous helpers that utilize iter.Seq and integrate nicely with Gather
+- `WithElasticWorkers(minWorkerSize,TTL)` allow workers to scale up/down as needed to save on memory and overhead.
+- `WithControls(*gather.Controls)` provide a controller to tune the config at runtime and collect stat snapshots.
 - include `WithEventHook(hook func(Event)) Opt` which can be used for logging/debugging
