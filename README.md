@@ -165,7 +165,10 @@ go func(){
 #### 3: Configure and run the worker pool
 
 ```go
-opts = gather.WithWorkerSize(runtime.GOMAXPROCS(0))
+opts = []gather.Opt{
+    gather.WithWorkerSize(runtime.GOMAXPROCS(0)),
+    gather.WithBufferSize(1),
+}
 out := gather.Workers(ctx, in, handler, opts...) 
 ```
 
@@ -213,4 +216,6 @@ Please see [examples/](/examples/) folder for some simple examples.
 
 - sharding across multiple channels
 - seq package: offer synchronous helpers that utilize iter.Seq and integrate nicely with Gather
+- `WithElasticWorkers(minWorkerSize,TTL)` allow workers to scale up/down as needed to save on memory and overhead.
+- `WithControls(*gather.Controls)` provide a controller to tune the config at runtime and collect stat snapshots.
 - include `WithEventHook(hook func(Event)) Opt` which can be used for logging/debugging
