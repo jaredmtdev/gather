@@ -154,13 +154,19 @@ func (ws *workerStation[IN, OUT]) SendResult(ctx context.Context, jobOut job[OUT
 
 // StartWorker - starts a single worker to ingest the queue.
 func (ws *workerStation[IN, OUT]) StartWorker(ctx context.Context) {
-	for jobIn := range ws.queue {
+	for {
+		var jobIn job[IN]
+		var ok bool
 		select {
 		case <-ctx.Done():
-			ws.wgJob.Done()
-			// drain any remaining jobs in queue to zero out the wait group
-			continue
-		default:
+			for range ws.queue {
+				ws.wgJob.Done()
+			}
+			return
+		case jobIn, ok = <-ws.queue:
+			if !ok {
+				return
+			}
 		}
 		scope := Scope[IN]{
 			reenqueue: ws.buildReenqueueFunc(ctx, jobIn.index),
