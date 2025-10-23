@@ -2,16 +2,39 @@ package gather
 
 import (
 	"context"
-	"fmt"
 	"sync"
+	"sync/atomic"
+	"time"
 )
 
 // workerOpts - configures behavior of Workers.
 type workerOpts struct {
-	workerSize     int
+	maxWorkerSize  int
+	minWorkerSize  int
+	ttlElastic     time.Duration
+	elasticWorkers bool
 	bufferSize     int
 	orderPreserved bool
 	panicOnNil     bool
+}
+
+func (wo *workerOpts) Validate() error {
+	if wo.maxWorkerSize <= 0 {
+		return newInvalidWorkerSizeError(wo.maxWorkerSize)
+	}
+	if wo.bufferSize < 0 {
+		return newInvalidBufferSizeError(wo.bufferSize)
+	}
+	if wo.minWorkerSize < 0 {
+		return newInvalidMinWorkerSizeError(wo.minWorkerSize)
+	}
+	if wo.ttlElastic < 0 {
+		return newInvalidTTLError(wo.ttlElastic)
+	}
+	if wo.minWorkerSize > wo.maxWorkerSize {
+		return newMinWorkerSizeTooLargeError(wo.minWorkerSize, wo.maxWorkerSize)
+	}
+	return nil
 }
 
 // Opt - options used to configure Workers.
@@ -22,11 +45,8 @@ type Opt func(w *workerOpts)
 //
 // Uses 1 by default.
 func WithWorkerSize(workerSize int) Opt {
-	if workerSize <= 0 {
-		panic(fmt.Sprintf("must use at least 1 worker! workerSize: %v", workerSize))
-	}
 	return func(w *workerOpts) {
-		w.workerSize = workerSize
+		w.maxWorkerSize = workerSize
 	}
 }
 
@@ -34,9 +54,6 @@ func WithWorkerSize(workerSize int) Opt {
 //
 // Uses unbuffered channels by default.
 func WithBufferSize(bufferSize int) Opt {
-	if bufferSize < 0 {
-		panic(fmt.Sprintf("buffer must be at least 0! bufferSize: %v", bufferSize))
-	}
 	return func(w *workerOpts) {
 		w.bufferSize = bufferSize
 	}
@@ -58,12 +75,29 @@ func WithPanicOnNilChannel() Opt {
 	}
 }
 
+// WithElasticWorkers - makes workers elastic: automatically scale up and down as needed.
+// Start at `minWorkerSize` workers and scale up to `workerSize`.
+// The scaling is done incrementally. Each increment is applied after `ttl`.
+func WithElasticWorkers(minWorkerSize int, ttl time.Duration) Opt {
+	return func(w *workerOpts) {
+		w.minWorkerSize = minWorkerSize
+		w.ttlElastic = ttl
+		w.elasticWorkers = true
+	}
+}
+
 func newWorkerOpts(opts []Opt) *workerOpts {
 	wo := &workerOpts{
-		workerSize: 1,
+		maxWorkerSize: 1,
 	}
 	for _, opt := range opts {
 		opt(wo)
+	}
+	if !wo.elasticWorkers {
+		wo.minWorkerSize = wo.maxWorkerSize
+	}
+	if err := wo.Validate(); err != nil {
+		panic(err.Error())
 	}
 	return wo
 }
@@ -72,11 +106,16 @@ func newWorkerOpts(opts []Opt) *workerOpts {
 type workerStation[IN, OUT any] struct {
 	*workerOpts
 
-	queue   chan job[IN]
-	ordered chan job[OUT]
-	out     chan OUT
-	wgJob   sync.WaitGroup
-	handler HandlerFunc[IN, OUT]
+	queue           chan job[IN]
+	ordered         chan job[OUT]
+	out             chan OUT
+	doneReconciler  chan struct{}
+	shutDownWorker  chan struct{}
+	wgJob           sync.WaitGroup
+	wgWorker        sync.WaitGroup
+	handler         HandlerFunc[IN, OUT]
+	workerCount     int
+	idleWorkerCount atomic.Int64
 }
 
 // job - wraps around incoming and outgoing data (val) to track job metadata.
@@ -119,6 +158,9 @@ func (ws *workerStation[IN, OUT]) Enqueue(ctx context.Context, in <-chan IN) {
 	go func() {
 		wgEnqueue.Wait()
 		ws.wgJob.Wait()
+		if ws.elasticWorkers {
+			close(ws.doneReconciler)
+		}
 		close(ws.queue)
 	}()
 }
@@ -154,6 +196,8 @@ func (ws *workerStation[IN, OUT]) SendResult(ctx context.Context, jobOut job[OUT
 
 // StartWorker - starts a single worker to ingest the queue.
 func (ws *workerStation[IN, OUT]) StartWorker(ctx context.Context) {
+	ws.idleWorkerCount.Add(1)
+	defer ws.idleWorkerCount.Add(-1)
 	for {
 		var jobIn job[IN]
 		var ok bool
@@ -163,11 +207,14 @@ func (ws *workerStation[IN, OUT]) StartWorker(ctx context.Context) {
 				ws.wgJob.Done()
 			}
 			return
+		case <-ws.shutDownWorker:
+			return
 		case jobIn, ok = <-ws.queue:
 			if !ok {
 				return
 			}
 		}
+		ws.idleWorkerCount.Add(-1)
 		scope := Scope[IN]{
 			reenqueue: ws.buildReenqueueFunc(ctx, jobIn.index),
 			wgJob:     &ws.wgJob,
@@ -177,6 +224,70 @@ func (ws *workerStation[IN, OUT]) StartWorker(ctx context.Context) {
 		jobOut := job[OUT]{val: res, err: err, index: jobIn.index}
 		if !scope.willRetry {
 			ws.SendResult(ctx, jobOut, err)
+		}
+		ws.idleWorkerCount.Add(1)
+	}
+}
+
+// ScaleWorkersBy - how many workers we need to increase or decrease.
+func (ws *workerStation[IN, OUT]) ScaleWorkersBy(_ context.Context) int {
+	if ws.maxWorkerSize == ws.minWorkerSize {
+		return 0
+	}
+	maxReconciles := 4
+	maxAdjustment := (ws.maxWorkerSize - ws.minWorkerSize - 1) / maxReconciles
+	maxAdjustment = max(1, maxAdjustment)
+	maxIncrease := min(maxAdjustment, ws.maxWorkerSize-ws.workerCount)
+	maxDecrease := min(maxAdjustment, ws.workerCount-ws.minWorkerSize)
+
+	// check if it's time to scale up
+	// based on queue depth + number of idle workers
+	// if ws.workerCount < ws.maxWorkerSize && (idleWorkerCount == 0 || queueDepth > 0) {
+	if ws.workerCount < ws.maxWorkerSize {
+		if queueDepth := len(ws.queue); queueDepth > 0 {
+			return min(queueDepth, maxIncrease)
+		} else if idleWorkers := ws.idleWorkerCount.Load(); idleWorkers == 0 {
+			return maxIncrease
+		}
+	}
+
+	if ws.workerCount <= ws.minWorkerSize {
+		return 0
+	}
+
+	idleWorkers := int(ws.idleWorkerCount.Load())
+	return -min(idleWorkers, maxDecrease)
+}
+
+func (ws *workerStation[IN, OUT]) ReconcileWorkers(ctx context.Context) {
+	adjustment := ws.ScaleWorkersBy(ctx)
+	for range -adjustment {
+		select {
+		case <-ctx.Done():
+			return
+		case ws.shutDownWorker <- struct{}{}:
+			ws.workerCount--
+		default:
+		}
+	}
+	for range adjustment {
+		ws.wgWorker.Go(func() {
+			ws.StartWorker(ctx)
+		})
+		ws.workerCount++
+	}
+}
+
+// ReconcileLoop - continuously reconcile the worker size until finished or cancelled.
+func (ws *workerStation[IN, OUT]) ReconcileLoop(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ws.doneReconciler:
+			return
+		case <-time.After(ws.ttlElastic):
+			ws.ReconcileWorkers(ctx)
 		}
 	}
 }
@@ -255,10 +366,19 @@ func Workers[IN any, OUT any](
 
 	ws.Enqueue(ctx, in)
 
-	wgWorker := sync.WaitGroup{}
-	for range ws.workerSize {
-		wgWorker.Go(func() {
+	ws.wgWorker = sync.WaitGroup{}
+	for range ws.minWorkerSize {
+		ws.wgWorker.Go(func() {
 			ws.StartWorker(ctx)
+		})
+		ws.workerCount++
+	}
+
+	if ws.elasticWorkers {
+		ws.doneReconciler = make(chan struct{})
+		ws.shutDownWorker = make(chan struct{})
+		ws.wgWorker.Go(func() {
+			ws.ReconcileLoop(ctx)
 		})
 	}
 
@@ -270,7 +390,7 @@ func Workers[IN any, OUT any](
 	}
 
 	go func() {
-		wgWorker.Wait()
+		ws.wgWorker.Wait()
 		if ws.orderPreserved {
 			close(ws.ordered)
 			wgOrdered.Wait()
