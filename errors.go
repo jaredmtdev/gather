@@ -14,11 +14,11 @@ var (
 	errMinWorkerSizeTooLarge = errors.New("minWorkerSize cannot be larger than workerSize")
 )
 
-func newInvalidWorkerSizeError(workerSize int) error {
+func newInvalidWorkerSizeError(workerSize int64) error {
 	return fmt.Errorf("%w. workerSize: %v", errInvalidWorkerSize, workerSize)
 }
 
-func newInvalidMinWorkerSizeError(minWorkerSize int) error {
+func newInvalidMinWorkerSizeError(minWorkerSize int64) error {
 	return fmt.Errorf("%w. minWorkerSize: %v", errInvalidMinWorkerSize, minWorkerSize)
 }
 
@@ -30,6 +30,6 @@ func newInvalidTTLError(ttl time.Duration) error {
 	return fmt.Errorf("%w. ttlElastic: %v ns", errInvalidTTL, ttl.Nanoseconds())
 }
 
-func newMinWorkerSizeTooLargeError(minWorkerSize, maxWorkerSize int) error {
+func newMinWorkerSizeTooLargeError(minWorkerSize, maxWorkerSize int64) error {
 	return fmt.Errorf("%w. minWorkerSize: %v workerSize: %v", errMinWorkerSizeTooLarge, minWorkerSize, maxWorkerSize)
 }
