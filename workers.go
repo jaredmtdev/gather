@@ -18,7 +18,7 @@ type workerOpts struct {
 	panicOnNil     bool
 }
 
-func (wo *workerOpts) Validate() error {
+func (wo *workerOpts) validate() error {
 	if wo.maxWorkerSize <= 0 {
 		return newInvalidWorkerSizeError(wo.maxWorkerSize)
 	}
@@ -98,7 +98,7 @@ func newWorkerOpts(opts []Opt) *workerOpts {
 	if !wo.elasticWorkers {
 		wo.minWorkerSize = wo.maxWorkerSize
 	}
-	if err := wo.Validate(); err != nil {
+	if err := wo.validate(); err != nil {
 		panic(err.Error())
 	}
 	return wo
@@ -156,7 +156,9 @@ func (ws *workerStation[IN, OUT]) enqueueLoop(ctx context.Context, in <-chan IN)
 			}
 			workerCount := ws.workerCount.Load()
 			if workerCount >= ws.minWorkerSize && workerCount < ws.maxWorkerSize {
-				ws.AddWorker(ctx)
+				ws.wgWorker.Go(func() {
+					ws.startWorker(ctx)
+				})
 				ws.workerCount.Add(1)
 			}
 		}
@@ -171,10 +173,10 @@ func (ws *workerStation[IN, OUT]) enqueueLoop(ctx context.Context, in <-chan IN)
 	}
 }
 
-// Enqueue - enqueues input data for workers to process.
+// enqueue - enqueues input data for workers to process.
 // this "middleman" logic is used to allow retries to send jobs back into queue
 // note that we can't send to in chan because we don't control when in chan is closed.
-func (ws *workerStation[IN, OUT]) Enqueue(ctx context.Context, in <-chan IN) {
+func (ws *workerStation[IN, OUT]) enqueue(ctx context.Context, in <-chan IN) {
 	wgEnqueue := sync.WaitGroup{}
 	wgEnqueue.Go(func() {
 		ws.enqueueLoop(ctx, in)
@@ -198,8 +200,8 @@ func (ws *workerStation[IN, OUT]) buildReenqueueFunc(ctx context.Context, index 
 	}
 }
 
-// SendResult - sends result from worker to the next step (either out or reorder gate).
-func (ws *workerStation[IN, OUT]) SendResult(ctx context.Context, jobOut job[OUT], err error) {
+// sendResult - sends result from worker to the next step (either out or reorder gate).
+func (ws *workerStation[IN, OUT]) sendResult(ctx context.Context, jobOut job[OUT], err error) {
 	defer ws.wgJob.Done()
 	if ws.orderPreserved {
 		select {
@@ -222,8 +224,8 @@ func (ws *workerStation[IN, OUT]) wgJobFlush() {
 	}
 }
 
-// StartWorker - starts a single worker to ingest the queue.
-func (ws *workerStation[IN, OUT]) StartWorker(ctx context.Context) {
+// startWorker - starts a single worker to ingest the queue.
+func (ws *workerStation[IN, OUT]) startWorker(ctx context.Context) {
 	defer ws.workerCount.Add(-1)
 	var tick <-chan time.Time
 	for {
@@ -255,20 +257,24 @@ func (ws *workerStation[IN, OUT]) StartWorker(ctx context.Context) {
 		res, err := ws.handler(ctx, jobIn.val, &scope)
 		jobOut := job[OUT]{val: res, err: err, index: jobIn.index}
 		if !scope.willRetry {
-			ws.SendResult(ctx, jobOut, err)
+			ws.sendResult(ctx, jobOut, err)
 		}
 	}
 }
 
-func (ws *workerStation[IN, OUT]) AddWorker(ctx context.Context) {
-	ws.wgWorker.Go(func() {
-		ws.StartWorker(ctx)
-	})
+// initWorkers - initializes all workers.
+func (ws *workerStation[IN, OUT]) initWorkers(ctx context.Context) {
+	for range ws.minWorkerSize {
+		ws.wgWorker.Go(func() {
+			ws.startWorker(ctx)
+		})
+	}
+	ws.workerCount.Add(ws.minWorkerSize)
 }
 
-// Reorder - gate used to cache the result until the "next" result is cached and ready to be sent to out chan.
+// reorder - gate used to cache the result until the "next" result is cached and ready to be sent to out chan.
 // makes sure all results are sent to out chan in the same order it was received from in chan.
-func (ws *workerStation[IN, OUT]) Reorder(ctx context.Context) {
+func (ws *workerStation[IN, OUT]) reorder(ctx context.Context) {
 	var nextJobOutIndex uint64
 	jobOutCache := map[uint64]job[OUT]{}
 	for jobOutReceived := range ws.ordered {
@@ -338,17 +344,14 @@ func Workers[IN any, OUT any](
 		return ws.out
 	}
 
-	ws.Enqueue(ctx, in)
+	ws.enqueue(ctx, in)
 
-	for range ws.minWorkerSize {
-		ws.AddWorker(ctx)
-	}
-	ws.workerCount.Add(ws.minWorkerSize)
+	ws.initWorkers(ctx)
 
 	wgOrdered := sync.WaitGroup{}
 	if ws.orderPreserved {
 		wgOrdered.Go(func() {
-			ws.Reorder(ctx)
+			ws.reorder(ctx)
 		})
 	}
 
