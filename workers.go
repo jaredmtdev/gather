@@ -135,7 +135,7 @@ func (ws *workerStation[IN, OUT]) getInputValue(ctx context.Context, in <-chan I
 	}
 }
 
-func (ws *workerStation[IN, OUT]) enqueueLoop(ctx context.Context, in <-chan IN) {
+func (ws *workerStation[IN, OUT]) runEnqueuer(ctx context.Context, in <-chan IN) {
 	var indexCounter uint64
 	for {
 		inputValue, ok := ws.getInputValue(ctx, in)
@@ -173,17 +173,12 @@ func (ws *workerStation[IN, OUT]) enqueueLoop(ctx context.Context, in <-chan IN)
 	}
 }
 
-// enqueue - enqueues input data for workers to process.
+// initEnqueuer - enqueues input data for workers to process.
 // this "middleman" logic is used to allow retries to send jobs back into queue
 // note that we can't send to in chan because we don't control when in chan is closed.
-func (ws *workerStation[IN, OUT]) enqueue(ctx context.Context, in <-chan IN) {
-	wgEnqueue := sync.WaitGroup{}
-	wgEnqueue.Go(func() {
-		ws.enqueueLoop(ctx, in)
-	})
-
+func (ws *workerStation[IN, OUT]) initEnqueuer(ctx context.Context, in <-chan IN) {
 	go func() {
-		wgEnqueue.Wait()
+		ws.runEnqueuer(ctx, in)
 		ws.wgJob.Wait()
 		close(ws.queue)
 	}()
@@ -344,7 +339,7 @@ func Workers[IN any, OUT any](
 		return ws.out
 	}
 
-	ws.enqueue(ctx, in)
+	ws.initEnqueuer(ctx, in)
 
 	ws.initWorkers(ctx)
 
