@@ -77,7 +77,9 @@ func WithPanicOnNilChannel() Opt {
 
 // WithElasticWorkers - makes workers elastic: automatically scale up and down as needed.
 // Start at `minWorkerSize` workers and scale up to `workerSize`.
-// The scaling is done incrementally. Each increment is applied after `ttl`.
+//
+// Scales up instantly as needed (for faster response to bursts).
+// Scales down each worker after being idle for ttl.
 func WithElasticWorkers(minWorkerSize int, ttl time.Duration) Opt {
 	return func(w *workerOpts) {
 		w.minWorkerSize = int64(minWorkerSize)
@@ -123,7 +125,7 @@ type job[T any] struct {
 	err   error
 }
 
-func (ws *workerStation[IN, OUT]) getInput(ctx context.Context, in <-chan IN) (IN, bool) {
+func (ws *workerStation[IN, OUT]) getInputValue(ctx context.Context, in <-chan IN) (IN, bool) {
 	select {
 	case v, ok := <-in:
 		return v, ok
@@ -136,7 +138,7 @@ func (ws *workerStation[IN, OUT]) getInput(ctx context.Context, in <-chan IN) (I
 func (ws *workerStation[IN, OUT]) enqueueLoop(ctx context.Context, in <-chan IN) {
 	var indexCounter uint64
 	for {
-		inputValue, ok := ws.getInput(ctx, in)
+		inputValue, ok := ws.getInputValue(ctx, in)
 		if !ok {
 			return
 		}
@@ -338,7 +340,6 @@ func Workers[IN any, OUT any](
 
 	ws.Enqueue(ctx, in)
 
-	ws.wgWorker = sync.WaitGroup{}
 	for range ws.minWorkerSize {
 		ws.AddWorker(ctx)
 	}
