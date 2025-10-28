@@ -12,7 +12,9 @@ import (
 func TestWorkersSpawnAndImmediatelyCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ws := &workerStation[int, int]{}
+	ws := &workerStation[int, int]{
+		workerOpts: &workerOpts{},
+	}
 	ws.queue = make(chan job[int])
 	ws.out = make(chan int, 1)
 
