@@ -98,9 +98,6 @@ func newWorkerOpts(opts []Opt) *workerOpts {
 	if !wo.elasticWorkers {
 		wo.minWorkerSize = wo.maxWorkerSize
 	}
-	if err := wo.validate(); err != nil {
-		panic(err.Error())
-	}
 	return wo
 }
 
@@ -146,9 +143,6 @@ func (ws *workerStation[IN, OUT]) runEnqueuer(ctx context.Context, in <-chan IN)
 
 		if ws.elasticWorkers {
 			select {
-			case <-ctx.Done():
-				ws.wgJob.Done()
-				return
 			case ws.queue <- job[IN]{val: inputValue, index: indexCounter}:
 				indexCounter++
 				continue
@@ -177,10 +171,12 @@ func (ws *workerStation[IN, OUT]) runEnqueuer(ctx context.Context, in <-chan IN)
 // this "middleman" logic is used to allow retries to send jobs back into queue
 // note that we can't send to in chan because we don't control when in chan is closed.
 func (ws *workerStation[IN, OUT]) initEnqueuer(ctx context.Context, in <-chan IN) {
+	ws.wgWorker.Add(1) // keep workers alive while enqueuer is still running
 	go func() {
 		ws.runEnqueuer(ctx, in)
 		ws.wgJob.Wait()
 		close(ws.queue)
+		ws.wgWorker.Done()
 	}()
 }
 
@@ -324,6 +320,9 @@ func Workers[IN any, OUT any](
 	ws := &workerStation[IN, OUT]{
 		workerOpts: newWorkerOpts(opts),
 		handler:    handler,
+	}
+	if err := ws.validate(); err != nil {
+		panic(err.Error())
 	}
 	ws.queue = make(chan job[IN], ws.bufferSize)
 	if ws.orderPreserved {
