@@ -105,13 +105,14 @@ func newWorkerOpts(opts []Opt) *workerOpts {
 type workerStation[IN, OUT any] struct {
 	*workerOpts
 
-	queue       chan job[IN]
-	ordered     chan job[OUT]
-	out         chan OUT
-	wgJob       sync.WaitGroup
-	wgWorker    sync.WaitGroup
-	handler     HandlerFunc[IN, OUT]
-	workerCount atomic.Int64
+	queue        chan job[IN]
+	ordered      chan job[OUT]
+	out          chan OUT
+	wgJob        sync.WaitGroup
+	wgWorker     sync.WaitGroup
+	handler      HandlerFunc[IN, OUT]
+	workerCount  atomic.Int64
+	jobsInFlight atomic.Int64
 }
 
 // job - wraps around incoming and outgoing data (val) to track job metadata.
@@ -142,6 +143,7 @@ func (ws *workerStation[IN, OUT]) runEnqueuer(ctx context.Context, in <-chan IN)
 		ws.wgJob.Add(1)
 
 		if ws.elasticWorkers {
+			ws.jobsInFlight.Add(1) // save cost of tracking if not elastic workers
 			select {
 			case ws.queue <- job[IN]{val: inputValue, index: indexCounter}:
 				indexCounter++
@@ -194,6 +196,9 @@ func (ws *workerStation[IN, OUT]) buildReenqueueFunc(ctx context.Context, index 
 // sendResult - sends result from worker to the next step (either out or reorder gate).
 func (ws *workerStation[IN, OUT]) sendResult(ctx context.Context, jobOut job[OUT], err error) {
 	defer ws.wgJob.Done()
+	if ws.elasticWorkers {
+		ws.jobsInFlight.Add(-1)
+	}
 	if ws.orderPreserved {
 		select {
 		case <-ctx.Done():
@@ -231,7 +236,7 @@ func (ws *workerStation[IN, OUT]) startWorker(ctx context.Context) {
 			return
 		case <-tick:
 			// TODO: use a limiter to slow down scaling down
-			if ws.workerCount.Load() > ws.minWorkerSize {
+			if ws.workerCount.Load() > ws.minWorkerSize && ws.jobsInFlight.Load() == 0 {
 				return
 			}
 			continue

@@ -553,10 +553,11 @@ func TestElasticWorkersLargeMinAndMaxWorkers(t *testing.T) {
 	jobs := 200
 	opts := []gather.Opt{
 		gather.WithBufferSize(3),
-		gather.WithWorkerSize(1000),
-		gather.WithElasticWorkers(999, 100*time.Microsecond),
+		gather.WithWorkerSize(180),
+		gather.WithElasticWorkers(179, 10*time.Microsecond),
 	}
-	out := gather.Workers(ctx, gen(ctx, jobs, 3), add(3), opts...)
+	mw := mwDelay[int, int](time.Microsecond)
+	out := gather.Workers(ctx, gen(ctx, jobs, 3), mw(add(3)), opts...)
 	var actual int
 	seen := make([]bool, jobs)
 	for v := range out {
