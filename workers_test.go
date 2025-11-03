@@ -567,3 +567,26 @@ func TestElasticWorkersLargeMinAndMaxWorkers(t *testing.T) {
 	}
 	assert.Equal(t, jobs, actual)
 }
+
+func TestElasticWorkersNoTTLNoMinPipelineOrdered(t *testing.T) {
+	ctx := context.Background()
+
+	opts := []gather.Opt{
+		gather.WithWorkerSize(5),
+		gather.WithElasticWorkers(0, 0),
+		gather.WithBufferSize(5),
+		gather.WithOrderPreserved(),
+	}
+
+	mw := mwRandomDelay[int, int](time.Now().UnixNano(), 0, 400*time.Nanosecond)
+
+	out1 := gather.Workers(ctx, gen(ctx, 1000), mw(add(3)), opts...)
+	out2 := gather.Workers(ctx, out1, subtract(3), opts...)
+	out3 := gather.Workers(ctx, out2, add(3), gather.WithElasticWorkers(0, 0), gather.WithOrderPreserved())
+	var got int
+	for v := range out3 {
+		require.Equal(t, got+3, v)
+		got++
+	}
+	assert.Equal(t, 1000, got)
+}
