@@ -126,6 +126,9 @@ type job[T any] struct {
 func (ws *workerStation[IN, OUT]) getInputValue(ctx context.Context, in <-chan IN) (IN, bool) {
 	select {
 	case v, ok := <-in:
+		if ok && ws.elasticWorkers {
+			ws.jobsInFlight.Add(1) // save cost of tracking if not elastic workers
+		}
 		return v, ok
 	case <-ctx.Done():
 		var v IN
@@ -143,15 +146,13 @@ func (ws *workerStation[IN, OUT]) runEnqueuer(ctx context.Context, in <-chan IN)
 		ws.wgJob.Add(1)
 
 		if ws.elasticWorkers {
-			ws.jobsInFlight.Add(1) // save cost of tracking if not elastic workers
 			select {
 			case ws.queue <- job[IN]{val: inputValue, index: indexCounter}:
 				indexCounter++
 				continue
 			default:
 			}
-			workerCount := ws.workerCount.Load()
-			if workerCount >= ws.minWorkerSize && workerCount < ws.maxWorkerSize {
+			if workerCount := ws.workerCount.Load(); workerCount >= ws.minWorkerSize && workerCount < ws.maxWorkerSize {
 				ws.wgWorker.Go(func() {
 					ws.startWorker(ctx)
 				})
@@ -222,7 +223,6 @@ func (ws *workerStation[IN, OUT]) wgJobFlush() {
 
 // startWorker - starts a single worker to ingest the queue.
 func (ws *workerStation[IN, OUT]) startWorker(ctx context.Context) {
-	defer ws.workerCount.Add(-1)
 	var tick <-chan time.Time
 	for {
 		if ws.elasticWorkers {
@@ -235,13 +235,18 @@ func (ws *workerStation[IN, OUT]) startWorker(ctx context.Context) {
 			ws.wgJobFlush()
 			return
 		case <-tick:
-			// TODO: use a limiter to slow down scaling down
-			if ws.workerCount.Load() > ws.minWorkerSize && ws.jobsInFlight.Load() == 0 {
+			if workerCount := ws.workerCount.Load(); workerCount > ws.minWorkerSize && workerCount > ws.jobsInFlight.Load() {
+				ws.workerCount.Add(-1)
+				if ws.jobsInFlight.Load() > 0 && ws.workerCount.CompareAndSwap(0, 1) {
+					// prevents edge case that causes deadlock.
+					continue
+				}
 				return
 			}
 			continue
 		case jobIn, ok = <-ws.queue:
 			if !ok {
+				ws.workerCount.Add(-1)
 				return
 			}
 		}
