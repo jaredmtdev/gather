@@ -162,6 +162,9 @@ go func(){
 }
 ```
 
+Close the `in` channel when finished sending data.
+Otherwise, cancel the context to stop the worker at any point.
+
 #### 3: Configure and run the worker pool
 
 ```go
