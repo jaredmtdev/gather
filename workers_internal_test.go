@@ -12,7 +12,9 @@ import (
 func TestWorkersSpawnAndImmediatelyCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ws := &workerStation[int, int]{}
+	ws := &workerStation[int, int]{
+		workerOpts: &workerOpts{},
+	}
 	ws.queue = make(chan job[int])
 	ws.out = make(chan int, 1)
 
@@ -26,7 +28,7 @@ func TestWorkersSpawnAndImmediatelyCancel(t *testing.T) {
 
 	ws.wgJob.Add(1)
 	cancel()
-	ws.StartWorker(ctx)
+	ws.startWorker(ctx)
 	assert.Empty(t, ws.out)
 }
 
@@ -41,7 +43,7 @@ func TestReorder_CancelWhileBlockedOnOut(t *testing.T) {
 		ws := &workerStation[int, int]{out: out, ordered: ordered}
 
 		done := make(chan struct{})
-		go func() { ws.Reorder(ctx); close(done) }()
+		go func() { ws.reorder(ctx); close(done) }()
 
 		// send job to ordered chan but block from sending to out chan
 		ordered <- job[int]{val: 42, index: 0}
