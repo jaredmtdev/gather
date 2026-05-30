@@ -3,7 +3,6 @@ package gather
 import (
 	"context"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -105,14 +104,21 @@ func newWorkerOpts(opts []Opt) *workerOpts {
 type workerStation[IN, OUT any] struct {
 	*workerOpts
 
-	queue        chan job[IN]
-	ordered      chan job[OUT]
-	out          chan OUT
-	wgJob        sync.WaitGroup
-	wgWorker     sync.WaitGroup
-	handler      HandlerFunc[IN, OUT]
-	workerCount  atomic.Int64
-	jobsInFlight atomic.Int64
+	queue    chan job[IN]
+	ordered  chan job[OUT]
+	out      chan OUT
+	wgJob    sync.WaitGroup
+	wgWorker sync.WaitGroup
+	handler  HandlerFunc[IN, OUT]
+	stats    *workerStats
+	//workerCount  atomic.Int64
+	//jobsInFlight atomic.Int64
+}
+
+type workerStats struct {
+	workerCount  int64
+	jobsInFlight int64
+	mu           sync.Mutex
 }
 
 // job - wraps around incoming and outgoing data (val) to track job metadata.
@@ -127,7 +133,10 @@ func (ws *workerStation[IN, OUT]) getInputValue(ctx context.Context, in <-chan I
 	select {
 	case v, ok := <-in:
 		if ok && ws.elasticWorkers {
-			ws.jobsInFlight.Add(1) // save cost of tracking if not elastic workers
+			// save cost of tracking if not elastic workers
+			ws.stats.mu.Lock()
+			ws.stats.jobsInFlight++
+			ws.stats.mu.Unlock()
 		}
 		return v, ok
 	case <-ctx.Done():
@@ -146,18 +155,31 @@ func (ws *workerStation[IN, OUT]) runEnqueuer(ctx context.Context, in <-chan IN)
 		ws.wgJob.Add(1)
 
 		if ws.elasticWorkers {
+			//ws.stats.mu.Lock()
+			// if ws.stats.jobsInFlight > 0 && ws.stats.workerCount < ws.maxWorkerSize {
+			// 	if ws.stats.workerCount == 0 || ws.stats.workerCount < ws.stats.jobsInFlight {
+			// 		ws.stats.workerCount++
+			// 		ws.wgWorker.Go(func() {
+			// 			ws.startWorker(ctx)
+			// 		})
+			// 	}
+			// 	ws.stats.mu.Unlock()
+			// }
 			select {
 			case ws.queue <- job[IN]{val: inputValue, index: indexCounter}:
 				indexCounter++
 				continue
 			default:
 			}
-			if workerCount := ws.workerCount.Load(); workerCount >= ws.minWorkerSize && workerCount < ws.maxWorkerSize {
+			// idea: ws.workerCount and ws.jobsInFlight should be part of a struct where they can both be mutex locked
+			ws.stats.mu.Lock()
+			if ws.stats.workerCount >= ws.minWorkerSize && ws.stats.workerCount < ws.maxWorkerSize {
+				ws.stats.workerCount++
 				ws.wgWorker.Go(func() {
 					ws.startWorker(ctx)
 				})
-				ws.workerCount.Add(1)
 			}
+			ws.stats.mu.Unlock()
 		}
 
 		select {
@@ -198,7 +220,9 @@ func (ws *workerStation[IN, OUT]) buildReenqueueFunc(ctx context.Context, index 
 func (ws *workerStation[IN, OUT]) sendResult(ctx context.Context, jobOut job[OUT], err error) {
 	defer ws.wgJob.Done()
 	if ws.elasticWorkers {
-		ws.jobsInFlight.Add(-1)
+		ws.stats.mu.Lock()
+		ws.stats.jobsInFlight--
+		ws.stats.mu.Unlock()
 	}
 	if ws.orderPreserved {
 		select {
@@ -235,18 +259,25 @@ func (ws *workerStation[IN, OUT]) startWorker(ctx context.Context) {
 			ws.wgJobFlush()
 			return
 		case <-tick:
-			if workerCount := ws.workerCount.Load(); workerCount > ws.minWorkerSize && workerCount > ws.jobsInFlight.Load() {
-				ws.workerCount.Add(-1)
-				if ws.jobsInFlight.Load() > 0 && ws.workerCount.CompareAndSwap(0, 1) {
+			ws.stats.mu.Lock()
+			if ws.stats.workerCount > ws.minWorkerSize && ws.stats.workerCount > ws.stats.jobsInFlight {
+				ws.stats.workerCount--
+				if ws.stats.jobsInFlight > 0 && ws.stats.workerCount == 0 {
+					ws.stats.workerCount++
+					ws.stats.mu.Unlock()
 					// prevents edge case that causes deadlock.
 					continue
 				}
+				ws.stats.mu.Unlock()
 				return
 			}
+			ws.stats.mu.Unlock()
 			continue
 		case jobIn, ok = <-ws.queue:
 			if !ok {
-				ws.workerCount.Add(-1)
+				ws.stats.mu.Lock()
+				ws.stats.workerCount--
+				ws.stats.mu.Unlock()
 				return
 			}
 		}
@@ -270,7 +301,9 @@ func (ws *workerStation[IN, OUT]) initWorkers(ctx context.Context) {
 			ws.startWorker(ctx)
 		})
 	}
-	ws.workerCount.Add(ws.minWorkerSize)
+	ws.stats.mu.Lock()
+	ws.stats.workerCount += ws.minWorkerSize
+	ws.stats.mu.Unlock()
 }
 
 // reorder - gate used to cache the result until the "next" result is cached and ready to be sent to out chan.
@@ -330,6 +363,7 @@ func Workers[IN any, OUT any](
 	ws := &workerStation[IN, OUT]{
 		workerOpts: newWorkerOpts(opts),
 		handler:    handler,
+		stats:      &workerStats{},
 	}
 	if err := ws.validate(); err != nil {
 		panic(err.Error())
