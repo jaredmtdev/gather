@@ -111,8 +111,6 @@ type workerStation[IN, OUT any] struct {
 	wgWorker sync.WaitGroup
 	handler  HandlerFunc[IN, OUT]
 	stats    *workerStats
-	//workerCount  atomic.Int64
-	//jobsInFlight atomic.Int64
 }
 
 type workerStats struct {
@@ -235,6 +233,23 @@ func (ws *workerStation[IN, OUT]) wgJobFlush() {
 	}
 }
 
+func (ws *workerStation[IN, OUT]) shouldShutDownElasticWorker() bool {
+	ws.stats.mu.Lock()
+	if ws.stats.workerCount > ws.minWorkerSize && ws.stats.workerCount > ws.stats.jobsInFlight {
+		ws.stats.workerCount--
+		if ws.stats.jobsInFlight > 0 && ws.stats.workerCount == 0 {
+			ws.stats.workerCount++
+			ws.stats.mu.Unlock()
+			// prevents edge case that causes deadlock.
+			return false
+		}
+		ws.stats.mu.Unlock()
+		return true
+	}
+	ws.stats.mu.Unlock()
+	return false
+}
+
 // startWorker - starts a single worker to ingest the queue.
 func (ws *workerStation[IN, OUT]) startWorker(ctx context.Context) {
 	var tick <-chan time.Time
@@ -249,19 +264,9 @@ func (ws *workerStation[IN, OUT]) startWorker(ctx context.Context) {
 			ws.wgJobFlush()
 			return
 		case <-tick:
-			ws.stats.mu.Lock()
-			if ws.stats.workerCount > ws.minWorkerSize && ws.stats.workerCount > ws.stats.jobsInFlight {
-				ws.stats.workerCount--
-				if ws.stats.jobsInFlight > 0 && ws.stats.workerCount == 0 {
-					ws.stats.workerCount++
-					ws.stats.mu.Unlock()
-					// prevents edge case that causes deadlock.
-					continue
-				}
-				ws.stats.mu.Unlock()
+			if ws.shouldShutDownElasticWorker() {
 				return
 			}
-			ws.stats.mu.Unlock()
 			continue
 		case jobIn, ok = <-ws.queue:
 			if !ok {
