@@ -155,25 +155,15 @@ func (ws *workerStation[IN, OUT]) runEnqueuer(ctx context.Context, in <-chan IN)
 		ws.wgJob.Add(1)
 
 		if ws.elasticWorkers {
-			//ws.stats.mu.Lock()
-			// if ws.stats.jobsInFlight > 0 && ws.stats.workerCount < ws.maxWorkerSize {
-			// 	if ws.stats.workerCount == 0 || ws.stats.workerCount < ws.stats.jobsInFlight {
-			// 		ws.stats.workerCount++
-			// 		ws.wgWorker.Go(func() {
-			// 			ws.startWorker(ctx)
-			// 		})
-			// 	}
-			// 	ws.stats.mu.Unlock()
-			// }
-			select {
-			case ws.queue <- job[IN]{val: inputValue, index: indexCounter}:
-				indexCounter++
-				continue
-			default:
-			}
-			// idea: ws.workerCount and ws.jobsInFlight should be part of a struct where they can both be mutex locked
+			// Scale up if there are more in-flight jobs than workers (and we're
+			// below the max). jobsInFlight was incremented under this same mutex
+			// in getInputValue before we got here, so this guarantees the
+			// invariant: whenever jobsInFlight >= 1, workerCount >= 1. Without
+			// this, a buffered send could deposit a job with no live worker to
+			// process it (notably with minWorkerSize=0), deadlocking on close.
+
 			ws.stats.mu.Lock()
-			if ws.stats.workerCount >= ws.minWorkerSize && ws.stats.workerCount < ws.maxWorkerSize {
+			if ws.stats.workerCount < ws.stats.jobsInFlight && ws.stats.workerCount < ws.maxWorkerSize {
 				ws.stats.workerCount++
 				ws.wgWorker.Go(func() {
 					ws.startWorker(ctx)
