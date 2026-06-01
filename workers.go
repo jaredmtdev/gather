@@ -235,18 +235,16 @@ func (ws *workerStation[IN, OUT]) wgJobFlush() {
 
 func (ws *workerStation[IN, OUT]) shouldShutDownElasticWorker() bool {
 	ws.stats.mu.Lock()
+	defer ws.stats.mu.Unlock()
 	if ws.stats.workerCount > ws.minWorkerSize && ws.stats.workerCount > ws.stats.jobsInFlight {
 		ws.stats.workerCount--
 		if ws.stats.jobsInFlight > 0 && ws.stats.workerCount == 0 {
 			ws.stats.workerCount++
-			ws.stats.mu.Unlock()
 			// prevents edge case that causes deadlock.
 			return false
 		}
-		ws.stats.mu.Unlock()
 		return true
 	}
-	ws.stats.mu.Unlock()
 	return false
 }
 
