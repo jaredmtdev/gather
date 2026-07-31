@@ -22,7 +22,7 @@ test: ## Run unit tests.
 
 .PHONY: testx
 testx: ## Run unit tests multiple times to catch flakey tests.
-	go test -v -count=1000 `go list ./... | grep -v 'examples'` -failfast -timeout=30s -p 1 -parallel 2
+	go test -v -count=1000 `go list ./... | grep -v 'examples'` -failfast -timeout=40s -p 1 -parallel 2
 
 .PHONY: fuzz
 fuzz: ## Run fuzz tests to try to find edge cases.

@@ -432,13 +432,161 @@ func TestWorkersChangeInputToNilThenCancel(t *testing.T) {
 			cancel()
 		}()
 		out := gather.Workers(ctx, in, add(3), gather.WithWorkerSize(3))
-		var expected int
+		var actual int
 		seen := make([]bool, 20)
 		for v := range out {
 			assert.False(t, seen[v-3])
 			seen[v-3] = true
-			expected++
+			actual++
 		}
-		assert.Equal(t, 20, expected)
+		assert.Equal(t, 20, actual)
 	})
+}
+
+// send jobs immediately (to scale up workers to max)
+// then stop long enough to scale down to min.
+func TestElasticWorkers(t *testing.T) {
+	// startingGoroutines := runtime.NumGoroutine()
+	minWorkers := 0
+	maxWorkers := 5
+	ctx := context.Background()
+	opts := []gather.Opt{
+		gather.WithWorkerSize(maxWorkers),
+		gather.WithElasticWorkers(minWorkers, 100*time.Microsecond),
+	}
+	in := make(chan int)
+	jobs := 200
+	go func() {
+		for i := range jobs {
+			in <- i
+			if i == 100 {
+				// TODO: replace this (non deterministic when running with parallel tests) with exported runtime metrics
+				// maxGoroutines := runtime.NumGoroutine()
+
+				// scale down to min workers
+				time.Sleep(time.Duration(maxWorkers-minWorkers+1) * 100 * time.Microsecond)
+
+				// the number of schedulers inside Workers (this design can change over time)
+				// minGoroutines := runtime.NumGoroutine()
+				// assert.Equal(t, maxWorkers-minWorkers, maxGoroutines-minGoroutines)
+			}
+		}
+		// should have scaled back up to max workers
+		close(in)
+	}()
+	// assert.Equal(t, startingGoroutines+1, runtime.NumGoroutine())
+	out := gather.Workers(ctx, in, add(3), opts...)
+	var actual int
+	seen := make([]bool, jobs)
+	for v := range out {
+		assert.False(t, seen[v-3])
+		seen[v-3] = true
+		actual++
+	}
+	assert.Equal(t, jobs, actual)
+}
+
+// attempt to scale down a second time but it will already be at min.
+func TestElasticWorkersUpDownDown(t *testing.T) {
+	minWorkers := 1
+	maxWorkers := 5
+	ctx := context.Background()
+	opts := []gather.Opt{
+		gather.WithWorkerSize(maxWorkers),
+		gather.WithElasticWorkers(minWorkers, 100*time.Microsecond),
+	}
+	in := make(chan int)
+	jobs := 200
+	go func() {
+		for i := range jobs {
+			in <- i
+			if i == 100 {
+				// scale down to min workers
+				time.Sleep(time.Duration(maxWorkers-minWorkers+1) * 100 * time.Microsecond)
+			}
+			if i == 101 {
+				// get the only worker to hit ttl but prevent from scaling down
+				time.Sleep(200 * time.Microsecond)
+			}
+		}
+		// should have scaled back up to max workers
+		close(in)
+	}()
+	out := gather.Workers(ctx, in, add(3), opts...)
+	var actual int
+	seen := make([]bool, jobs)
+	for v := range out {
+		assert.False(t, seen[v-3])
+		seen[v-3] = true
+		actual++
+	}
+	assert.Equal(t, jobs, actual)
+}
+
+func TestElasticWorkersSynchronousOrderedEarlyCancel(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	opts := []gather.Opt{
+		gather.WithWorkerSize(2),
+		gather.WithElasticWorkers(0, 10*time.Microsecond),
+		gather.WithOrderPreserved(),
+	}
+
+	in := make(chan int)
+	go func() {
+		in <- 0
+		cancel()
+	}()
+
+	var got int
+	for v := range gather.Workers(ctx, in, add(3), opts...) {
+		require.Equal(t, got+3, v)
+		got++
+	}
+	assert.LessOrEqual(t, got, 1)
+	// assert.Empty(t, got)
+}
+
+func TestElasticWorkersLargeMinAndMaxWorkers(t *testing.T) {
+	ctx := context.Background()
+	jobs := 200
+	opts := []gather.Opt{
+		gather.WithBufferSize(3),
+		gather.WithWorkerSize(180),
+		gather.WithElasticWorkers(179, 10*time.Microsecond),
+	}
+	mw := mwDelay[int, int](time.Microsecond)
+	out := gather.Workers(ctx, gen(ctx, jobs, 3), mw(add(3)), opts...)
+	var actual int
+	seen := make([]bool, jobs)
+	for v := range out {
+		assert.False(t, seen[v-3])
+		seen[v-3] = true
+		actual++
+	}
+	assert.Equal(t, jobs, actual)
+}
+
+func TestElasticWorkersNoTTLNoMinPipelineOrdered(t *testing.T) {
+	ctx := context.Background()
+
+	opts := []gather.Opt{
+		gather.WithWorkerSize(5),
+		gather.WithElasticWorkers(0, 0),
+		gather.WithBufferSize(5),
+		gather.WithOrderPreserved(),
+	}
+
+	mw := mwRandomDelay[int, int](time.Now().UnixNano(), 0, 400*time.Nanosecond)
+
+	out1 := gather.Workers(ctx, gen(ctx, 1000), mw(add(3)), opts...)
+	out2 := gather.Workers(ctx, out1, subtract(3), opts...)
+	out3 := gather.Workers(ctx, out2, add(3), gather.WithElasticWorkers(0, 0), gather.WithOrderPreserved())
+	var got int
+	for v := range out3 {
+		require.Equal(t, got+3, v)
+		got++
+	}
+	assert.Equal(t, 1000, got)
 }

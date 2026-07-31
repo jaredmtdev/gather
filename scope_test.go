@@ -262,3 +262,29 @@ func TestScopeRetryThenWaitGroupGo(t *testing.T) {
 	assert.Equal(t, int32(3), counter.Load())
 	assert.Equal(t, int32(23), totalAttempts.Load())
 }
+
+func TestScopeRetryWithElasticWorkers(t *testing.T) {
+	ctx := context.Background()
+	jobs := 20
+	totalAttempts := atomic.Int64{}
+
+	opts := []gather.Opt{
+		gather.WithWorkerSize(5),
+		gather.WithElasticWorkers(0, 10*time.Microsecond),
+	}
+	handler := gather.HandlerFunc[int, int](func(_ context.Context, in int, scope *gather.Scope[int]) (int, error) {
+		totalAttempts.Add(1)
+		if in == jobs-1 || in == jobs {
+			scope.Retry(ctx, in+1)
+			return 0, errors.New("invalid number")
+		}
+		return in, nil
+	})
+
+	var got int
+	for range gather.Workers(ctx, gen(ctx, jobs), handler, opts...) {
+		got++
+	}
+	assert.Equal(t, jobs, got)
+	assert.Equal(t, int64(jobs+2), totalAttempts.Load())
+}
